@@ -181,7 +181,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                 <!-- Main Chart -->
                 <div class="lg:col-span-2 bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-                    <h3 class="text-lg font-outfit font-bold text-slate-800 mb-6">Promedio de Notas por Taller</h3>
+                    <h3 id="chartTitle" class="text-lg font-outfit font-bold text-slate-800 mb-6">Promedio de Notas por Taller</h3>
                     <div class="relative h-72 w-full">
                         <canvas id="scoresChart"></canvas>
                     </div>
@@ -241,8 +241,8 @@
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse whitespace-nowrap">
                         <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
-                                <th class="pb-3 text-left font-semibold text-slate-600">Nombre</th>
+                            <tr id="tableHeaderRow" class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
+                                <th class="pb-3 text-left font-semibold text-slate-600 pl-3">Nombre</th>
                                 <th class="pb-3 text-left font-semibold text-slate-600">Cargo</th>
                                 <th class="pb-3 text-left font-semibold text-slate-600">DNI</th>
                                 <th class="pb-3 text-left font-semibold text-slate-600">Capacitación</th>
@@ -448,6 +448,7 @@
 
                 let course = map.topic !== -1 && row[map.topic] ? String(row[map.topic]).trim() : 'General';
                 let dateVal = map.date !== -1 && row[map.date] ? String(row[map.date]).trim() : '';
+                let currentAgency = map.empresa !== -1 && row[map.empresa] ? String(row[map.empresa]).trim().toUpperCase() : 'SIN AGENCIA';
 
                 // Push every single evaluation as an individual record
                 globalAggregatedPeople.push({
@@ -456,6 +457,7 @@
                     cargo: cargo,
                     course: course,
                     date: dateVal,
+                    agency: currentAgency,
                     evalsCount: 1, // It's a single evaluation
                     avg: score // The score of this specific evaluation
                 });
@@ -516,10 +518,25 @@
 
         let chartInstance = null;
         function renderChart() {
-            if (globalCourseAverages.length === 0) return;
+            if (globalAggregatedPeople.length === 0) return;
 
-            const labels = globalCourseAverages.map(c => c.course);
-            const data = globalCourseAverages.map(c => c.avg.toFixed(1));
+            let groupKey = !agencyName ? 'agency' : 'course';
+            const tempMap = {};
+            globalAggregatedPeople.forEach(p => {
+                const key = p[groupKey] || 'Sin Dato';
+                if(!tempMap[key]) tempMap[key] = { key: key, totalScore: 0, count: 0 };
+                tempMap[key].totalScore += p.avg;
+                tempMap[key].count += 1;
+            });
+            const dataArr = Object.values(tempMap).map(c => ({
+                key: c.key,
+                avg: c.count > 0 ? (c.totalScore / c.count) : 0
+            }));
+
+            const labels = dataArr.map(c => c.key);
+            const data = dataArr.map(c => c.avg.toFixed(1));
+
+            document.getElementById('chartTitle').textContent = !agencyName ? 'Promedio de Notas por Agencia' : 'Promedio de Notas por Taller';
 
             const ctx = document.getElementById('scoresChart').getContext('2d');
             if (chartInstance) chartInstance.destroy();
@@ -555,106 +572,169 @@
         function renderDistributionChart() {
             if (globalAggregatedPeople.length === 0) return;
 
-            let sobresaliente = 0; // 18-20
-            let regular = 0; // 14-17
-            let deficiente = 0; // 0-13
-
-            globalAggregatedPeople.forEach(p => {
-                if (p.avg >= 18) sobresaliente++;
-                else if (p.avg >= 14) regular++;
-                else deficiente++;
-            });
-
             const ctx = document.getElementById('distributionChart').getContext('2d');
             if (distChartInstance) distChartInstance.destroy();
 
-            distChartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Sobresaliente (18-20)', 'Regular (14-17)', 'Deficiente (0-13)'],
-                    datasets: [{
-                        data: [sobresaliente, regular, deficiente],
-                        backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' }
+            if (!agencyName) {
+                // Stacked Bar Chart for Global View
+                const agencyStats = {};
+                globalAggregatedPeople.forEach(p => {
+                    if (!agencyStats[p.agency]) agencyStats[p.agency] = { sob: 0, reg: 0, def: 0 };
+                    if (p.avg >= 18) agencyStats[p.agency].sob++;
+                    else if (p.avg >= 14) agencyStats[p.agency].reg++;
+                    else agencyStats[p.agency].def++;
+                });
+
+                const labels = Object.keys(agencyStats);
+                const sobData = labels.map(l => agencyStats[l].sob);
+                const regData = labels.map(l => agencyStats[l].reg);
+                const defData = labels.map(l => agencyStats[l].def);
+
+                distChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Sobresaliente', data: sobData, backgroundColor: '#22c55e' },
+                            { label: 'Regular', data: regData, backgroundColor: '#eab308' },
+                            { label: 'Deficiente', data: defData, backgroundColor: '#ef4444' }
+                        ]
                     },
-                    cutout: '60%'
-                }
-            });
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+                        scales: { x: { stacked: true }, y: { stacked: true } }
+                    }
+                });
+            } else {
+                // Doughnut for Agency View
+                let sobresaliente = 0; let regular = 0; let deficiente = 0;
+                globalAggregatedPeople.forEach(p => {
+                    if (p.avg >= 18) sobresaliente++;
+                    else if (p.avg >= 14) regular++;
+                    else deficiente++;
+                });
+
+                distChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Sobresaliente (18-20)', 'Regular (14-17)', 'Deficiente (0-13)'],
+                        datasets: [{
+                            data: [sobresaliente, regular, deficiente],
+                            backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+                        cutout: '60%'
+                    }
+                });
+            }
         }
 
         let trendChartInstance = null;
         function renderTrendChart() {
             if (globalAggregatedPeople.length === 0) return;
 
-            // Agrupar por fecha
-            const dateMap = {};
-            globalAggregatedPeople.forEach(p => {
-                if (!p.date || p.date === 'Sin fecha') return;
-                
-                // Normalizamos la fecha (asumiendo que viene como D/M/YYYY o similar desde parseo)
-                // Si la fecha tiene horas, la cortamos
-                const dKey = p.date.split(' ')[0]; 
-
-                if (!dateMap[dKey]) {
-                    dateMap[dKey] = { sum: 0, count: 0 };
-                }
-                dateMap[dKey].sum += p.avg;
-                dateMap[dKey].count++;
-            });
-
-            // Ordenar fechas (es rudimentario pero funciona si el formato es estándar)
-            const sortedDates = Object.keys(dateMap).sort((a,b) => {
-                let pa = a.split('/');
-                let pb = b.split('/');
-                if(pa.length === 3 && pb.length === 3) {
-                    let da = new Date(pa[2], pa[1]-1, pa[0]);
-                    let db = new Date(pb[2], pb[1]-1, pb[0]);
-                    return da - db;
-                }
-                return a.localeCompare(b);
-            });
-
-            const labels = sortedDates;
-            const data = sortedDates.map(d => (dateMap[d].sum / dateMap[d].count).toFixed(2));
-
             const ctx = document.getElementById('trendChart').getContext('2d');
             if (trendChartInstance) trendChartInstance.destroy();
 
-            trendChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Promedio Diario',
-                        data: data,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            if (!agencyName) {
+                // Multi-line for Global View
+                const agencyMap = {};
+                globalAggregatedPeople.forEach(p => {
+                    if (!p.date || p.date === 'Sin fecha') return;
+                    const dKey = p.date.split(' ')[0]; 
+                    if (!agencyMap[p.agency]) agencyMap[p.agency] = {};
+                    if (!agencyMap[p.agency][dKey]) agencyMap[p.agency][dKey] = { sum: 0, count: 0 };
+                    agencyMap[p.agency][dKey].sum += p.avg;
+                    agencyMap[p.agency][dKey].count++;
+                });
+
+                const allDates = new Set();
+                Object.values(agencyMap).forEach(dMap => Object.keys(dMap).forEach(d => allDates.add(d)));
+                
+                const sortedDates = Array.from(allDates).sort((a,b) => {
+                    let pa = a.split('/'); let pb = b.split('/');
+                    if(pa.length === 3 && pb.length === 3) return new Date(pa[2], pa[1]-1, pa[0]) - new Date(pb[2], pb[1]-1, pb[0]);
+                    return a.localeCompare(b);
+                });
+
+                const datasets = [];
+                const colors = ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899', '#6366f1'];
+                let cIdx = 0;
+
+                Object.keys(agencyMap).forEach(ag => {
+                    const dataPoints = sortedDates.map(d => {
+                        if (agencyMap[ag][d]) return (agencyMap[ag][d].sum / agencyMap[ag][d].count).toFixed(2);
+                        return null; 
+                    });
+                    datasets.push({
+                        label: ag,
+                        data: dataPoints,
+                        borderColor: colors[cIdx % colors.length],
+                        backgroundColor: 'transparent',
                         borderWidth: 2,
                         tension: 0.3,
-                        fill: true,
-                        pointBackgroundColor: '#3b82f6'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 20,
-                            grid: { color: '#f1f5f9' }
-                        }
+                        spanGaps: true
+                    });
+                    cIdx++;
+                });
+
+                trendChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: sortedDates, datasets: datasets },
+                    options: { 
+                        responsive: true, maintainAspectRatio: false, 
+                        plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }, 
+                        scales: { y: { beginAtZero: true, max: 20, grid: { color: '#f1f5f9' } } } 
                     }
-                }
-            });
+                });
+
+            } else {
+                // Single line for Agency View
+                const dateMap = {};
+                globalAggregatedPeople.forEach(p => {
+                    if (!p.date || p.date === 'Sin fecha') return;
+                    const dKey = p.date.split(' ')[0]; 
+                    if (!dateMap[dKey]) dateMap[dKey] = { sum: 0, count: 0 };
+                    dateMap[dKey].sum += p.avg;
+                    dateMap[dKey].count++;
+                });
+
+                const sortedDates = Object.keys(dateMap).sort((a,b) => {
+                    let pa = a.split('/'); let pb = b.split('/');
+                    if(pa.length === 3 && pb.length === 3) return new Date(pa[2], pa[1]-1, pa[0]) - new Date(pb[2], pb[1]-1, pb[0]);
+                    return a.localeCompare(b);
+                });
+
+                const labels = sortedDates;
+                const data = sortedDates.map(d => (dateMap[d].sum / dateMap[d].count).toFixed(2));
+
+                trendChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Promedio Diario',
+                            data: data,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            pointBackgroundColor: '#3b82f6'
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, max: 20, grid: { color: '#f1f5f9' } } }
+                    }
+                });
+            }
         }
 
         function renderCriticalCourse() {
@@ -679,7 +759,32 @@
 
         function renderTable(searchTerm = '') {
             const tbody = document.getElementById('evaluationsTableBody');
-            if (!tbody) return;
+            const theadRow = document.getElementById('tableHeaderRow');
+            if (!tbody || !theadRow) return;
+
+            // Set headers based on global view
+            if (!agencyName) {
+                theadRow.innerHTML = `
+                    <th class="pb-3 text-left font-semibold text-slate-600 pl-3">Nombre</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">Agencia</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">Cargo</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">DNI</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">Capacitación</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">Fecha</th>
+                    <th class="pb-3 text-center font-semibold text-slate-600">Nota</th>
+                    <th class="p-3 text-center">Estado</th>
+                `;
+            } else {
+                theadRow.innerHTML = `
+                    <th class="pb-3 text-left font-semibold text-slate-600 pl-3">Nombre</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">Cargo</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">DNI</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">Capacitación</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600">Fecha</th>
+                    <th class="pb-3 text-center font-semibold text-slate-600">Nota</th>
+                    <th class="p-3 text-center">Estado</th>
+                `;
+            }
             
             tbody.innerHTML = '';
 
@@ -687,11 +792,13 @@
             const rowsToRender = globalAggregatedPeople.filter(p => 
                 p.dni.toLowerCase().includes(searchLower) ||
                 p.name.toLowerCase().includes(searchLower) ||
-                (p.cargo && p.cargo.toLowerCase().includes(searchLower))
+                (p.cargo && p.cargo.toLowerCase().includes(searchLower)) ||
+                (p.agency && p.agency.toLowerCase().includes(searchLower))
             );
 
             if (rowsToRender.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500 italic">No se encontraron evaluaciones con los filtros actuales.</td></tr>`;
+                const colspan = !agencyName ? 8 : 7;
+                tbody.innerHTML = `<tr><td colspan="${colspan}" class="p-8 text-center text-slate-500 italic">No se encontraron evaluaciones con los filtros actuales.</td></tr>`;
                 return;
             }
 
@@ -702,12 +809,15 @@
                     '<span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">Desaprobado</span>';
 
                 let badgeClass = promedio >= 14 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+                
+                let agencyCol = !agencyName ? `<td class="p-3 text-slate-600 text-sm font-semibold">${p.agency}</td>` : '';
 
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                        <td class="p-3">
+                        <td class="p-3 pl-3">
                             <div class="font-medium text-slate-800">${p.name}</div>
                         </td>
+                        ${agencyCol}
                         <td class="p-3 text-slate-600 text-sm">${p.cargo}</td>
                         <td class="p-3 text-slate-500 font-mono text-sm">${p.dni}</td>
                         <td class="p-3 text-slate-600 text-sm">${p.course}</td>
@@ -733,20 +843,22 @@
 
             // Top 3
             sortedDesc.slice(0,3).forEach(r => {
+                let dispName = !agencyName ? `${r.name} <span class="text-[10px] text-slate-400 font-normal">(${r.agency})</span>` : r.name;
                 if(r.avg >= 13) {
                     topList.innerHTML += `<li class="flex justify-between items-center">
-                        <span class="truncate pr-2">${r.name}</span>
+                        <span class="truncate pr-2 font-medium">${dispName}</span>
                         <span class="font-bold text-slate-800">${r.avg.toFixed(1)}</span>
                     </li>`;
                 }
             });
 
-            // Bottom
-            const bottom = sortedDesc.filter(r => r.avg < 13 && r.avg > 0).slice(0,3);
-            bottom.forEach(r => {
+            // Needs Help
+            const failed = sortedDesc.filter(r => r.avg < 13).reverse().slice(0,3);
+            failed.forEach(r => {
+                let dispName = !agencyName ? `${r.name} <span class="text-[10px] text-slate-400 font-normal">(${r.agency})</span>` : r.name;
                 needsHelpList.innerHTML += `<li class="flex justify-between items-center">
-                    <span class="truncate pr-2 text-slate-600">${r.name}</span>
-                    <span class="font-bold text-red-600 bg-red-50 px-2 rounded">${r.avg.toFixed(1)}</span>
+                    <span class="truncate pr-2 font-medium">${dispName}</span>
+                    <span class="font-bold text-red-600">${r.avg.toFixed(1)}</span>
                 </li>`;
             });
 
