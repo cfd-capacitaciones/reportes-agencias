@@ -132,7 +132,7 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-win-orange hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Personal</h3>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Evaluaciones</h3>
                         <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-win-orange">
                             <i class="fa-solid fa-users"></i>
                         </div>
@@ -220,11 +220,12 @@
                     <table class="w-full text-left border-collapse whitespace-nowrap">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
-                                <th class="p-3 text-left">DNI</th>
-                                <th class="p-3 text-left">NOMBRES</th>
-                                <th class="p-3 text-left">CARGO</th>
-                                <th class="p-3 text-center">TALLERES RINDIDOS</th>
-                                <th class="p-3 text-center bg-orange-50 text-win-orange">Promedio</th>
+                                <th class="pb-3 text-left font-semibold text-slate-600">Nombre</th>
+                                <th class="pb-3 text-left font-semibold text-slate-600">Cargo</th>
+                                <th class="pb-3 text-left font-semibold text-slate-600">DNI</th>
+                                <th class="pb-3 text-left font-semibold text-slate-600">Capacitación</th>
+                                <th class="pb-3 text-left font-semibold text-slate-600">Fecha</th>
+                                <th class="pb-3 text-center font-semibold text-slate-600">Nota</th>
                                 <th class="p-3 text-center">Estado</th>
                             </tr>
                         </thead>
@@ -403,8 +404,8 @@
                 return;
             }
 
-            let peopleMap = {};
             let coursesMap = {};
+            globalAggregatedPeople = [];
 
             filteredData.forEach(row => {
                 let dni = map.dni !== -1 && row[map.dni] ? String(row[map.dni]).trim() : 'Sin DNI';
@@ -424,27 +425,26 @@
                 if (isNaN(score)) score = 0;
 
                 let course = map.topic !== -1 && row[map.topic] ? String(row[map.topic]).trim() : 'General';
+                let dateVal = map.date !== -1 && row[map.date] ? String(row[map.date]).trim() : '';
 
-                if(!peopleMap[fullName]) {
-                    peopleMap[fullName] = { dni: dni, name: fullName, cargo: cargo, totalScore: 0, count: 0 };
-                }
-                peopleMap[fullName].totalScore += score;
-                peopleMap[fullName].count += 1;
+                // Push every single evaluation as an individual record
+                globalAggregatedPeople.push({
+                    dni: dni,
+                    name: fullName,
+                    cargo: cargo,
+                    course: course,
+                    date: dateVal,
+                    evalsCount: 1, // It's a single evaluation
+                    avg: score // The score of this specific evaluation
+                });
 
+                // We still want to group courses for the chart
                 if(!coursesMap[course]) {
                     coursesMap[course] = { course: course, totalScore: 0, count: 0 };
                 }
                 coursesMap[course].totalScore += score;
                 coursesMap[course].count += 1;
             });
-
-            globalAggregatedPeople = Object.values(peopleMap).map(p => ({
-                dni: p.dni,
-                name: p.name,
-                cargo: p.cargo,
-                evalsCount: p.count,
-                avg: p.count > 0 ? (p.totalScore / p.count) : 0
-            }));
 
             globalCourseAverages = Object.values(coursesMap).map(c => ({
                 course: c.course,
@@ -541,33 +541,35 @@
             );
 
             if (rowsToRender.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">No se encontraron evaluaciones con los filtros actuales.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500 italic">No se encontraron evaluaciones con los filtros actuales.</td></tr>`;
                 return;
             }
 
             rowsToRender.forEach(p => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-slate-50 transition-colors';
-
                 const promedio = p.avg;
-                
                 const statusHtml = promedio >= 14 ? 
                     '<span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">Aprobado</span>' : 
                     '<span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">Desaprobado</span>';
 
                 let badgeClass = promedio >= 14 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
 
-                tr.innerHTML = `
-                    <td class="px-6 py-4 font-medium text-slate-900">${p.dni}</td>
-                    <td class="px-6 py-4 font-semibold text-slate-800">${p.name}</td>
-                    <td class="px-6 py-4 text-slate-500">${p.cargo}</td>
-                    <td class="px-6 py-4 text-center font-bold text-slate-700">${p.evalsCount}</td>
-                    <td class="px-6 py-4 text-center">
-                        <span class="px-2 py-1 ${badgeClass} rounded font-bold">${promedio.toFixed(1)}</span>
-                    </td>
-                    <td class="px-6 py-4 text-center">${statusHtml}</td>
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                        <td class="p-3">
+                            <div class="font-medium text-slate-800">${p.name}</div>
+                        </td>
+                        <td class="p-3 text-slate-600 text-sm">${p.cargo}</td>
+                        <td class="p-3 text-slate-500 font-mono text-sm">${p.dni}</td>
+                        <td class="p-3 text-slate-600 text-sm">${p.course}</td>
+                        <td class="p-3 text-slate-500 font-mono text-sm">${p.date}</td>
+                        <td class="p-3 text-center font-semibold">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">
+                                ${p.avg > 0 ? p.avg.toFixed(2) : '-'}
+                            </span>
+                        </td>
+                        <td class="p-3 text-center">${statusHtml}</td>
+                    </tr>
                 `;
-                tbody.appendChild(tr);
             });
            }
            function renderHighlights() {
