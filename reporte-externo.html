@@ -512,22 +512,21 @@
         }
 
         function renderTable(searchTerm = '') {
-            const tbody = document.getElementById('tableBody');
-            const emptyState = document.getElementById('tableEmptyState');
+            const tbody = document.getElementById('evaluationsTableBody');
+            if (!tbody) return;
+            
             tbody.innerHTML = '';
 
             const searchLower = searchTerm.toLowerCase();
-            const rowsToRender = globalAggregatedPeople.filter(p => {
-                const name = p.name.toLowerCase();
-                const dni = p.dni.toLowerCase();
-                return name.includes(searchLower) || dni.includes(searchLower);
-            });
+            const rowsToRender = globalAggregatedPeople.filter(p => 
+                p.dni.toLowerCase().includes(searchLower) ||
+                p.name.toLowerCase().includes(searchLower) ||
+                (p.cargo && p.cargo.toLowerCase().includes(searchLower))
+            );
 
             if (rowsToRender.length === 0) {
-                emptyState.classList.remove('hidden');
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">No se encontraron evaluaciones con los filtros actuales.</td></tr>`;
                 return;
-            } else {
-                emptyState.classList.add('hidden');
             }
 
             rowsToRender.forEach(p => {
