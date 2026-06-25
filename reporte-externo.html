@@ -444,8 +444,6 @@
                         },
                         }
                     },
-                    plugins: {
-                        legend: { display: false }
                     }
                 }
             });
@@ -453,29 +451,13 @@
 
         function renderTable(searchTerm = '') {
             const tbody = document.getElementById('tableBody');
-            const theadTr = document.querySelector('thead tr');
             const emptyState = document.getElementById('tableEmptyState');
             tbody.innerHTML = '';
 
-            // Ensure dynamic headers are present
-            const currentHeaders = Array.from(theadTr.querySelectorAll('th')).map(th => th.textContent.trim());
-            
-            // Rebuild dynamic headers if not there
-            if (!theadTr.dataset.dynamicInit && coursesColumns.length > 0) {
-                const cargoIndex = 2; // Position after DNI, Nombres, Cargo
-                let insertHtml = '';
-                coursesColumns.forEach(col => {
-                    insertHtml += `<th class="px-6 py-4 text-center bg-slate-100">${col}</th>`;
-                });
-                // Insert after Cargo
-                theadTr.children[cargoIndex].insertAdjacentHTML('afterend', insertHtml);
-                theadTr.dataset.dynamicInit = "true";
-            }
-
             const searchLower = searchTerm.toLowerCase();
-            const rowsToRender = filteredData.filter(row => {
-                const name = (row['Nombres'] || row['Nombre'] || '').toLowerCase();
-                const dni = (row['DNI'] || row['Documento'] || '').toLowerCase();
+            const rowsToRender = globalAggregatedPeople.filter(p => {
+                const name = p.name.toLowerCase();
+                const dni = p.dni.toLowerCase();
                 return name.includes(searchLower) || dni.includes(searchLower);
             });
 
@@ -486,50 +468,33 @@
                 emptyState.classList.add('hidden');
             }
 
-            rowsToRender.forEach(row => {
+            rowsToRender.forEach(p => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 transition-colors';
 
-                const dni = row['DNI'] || row['Documento'] || '-';
-                const name = row['Nombres'] || row['Nombre'] || '-';
-                const cargo = row['Cargo'] || row['Puesto'] || '-';
-                const promedio = row._promedio || 0;
-                const status = promedio >= 13 ? 
+                const promedio = p.avg;
+                
+                const statusHtml = promedio >= 14 ? 
                     '<span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">Aprobado</span>' : 
                     '<span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">Desaprobado</span>';
 
-                let html = `
-                    <td class="px-6 py-4 font-medium text-slate-900">${dni}</td>
-                    <td class="px-6 py-4 font-semibold text-slate-800">${name}</td>
-                    <td class="px-6 py-4 text-slate-500">${cargo}</td>
-                `;
+                let badgeClass = promedio >= 14 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
 
-                coursesColumns.forEach(col => {
-                    let val = row[col];
-                    if(val === undefined || val === '') val = '-';
-                    // Optional styling for notes
-                    let badgeClass = '';
-                    let num = parseFloat(val);
-                    if(!isNaN(num)) {
-                        if(num < 13) badgeClass = 'text-red-500 font-semibold';
-                        else badgeClass = 'text-slate-700';
-                    }
-                    html += `<td class="px-6 py-4 text-center ${badgeClass}">${val}</td>`;
-                });
-
-                html += `
-                    <td class="px-6 py-4 text-center">-</td>
-                    <td class="px-6 py-4 text-center font-bold text-win-orange bg-orange-50/30">${promedio.toFixed(1)}</td>
-                    <td class="px-6 py-4 text-center">${status}</td>
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-slate-900">${p.dni}</td>
+                    <td class="px-6 py-4 font-semibold text-slate-800">${p.name}</td>
+                    <td class="px-6 py-4 text-slate-500">${p.cargo}</td>
+                    <td class="px-6 py-4 text-center font-bold text-slate-700">${p.evalsCount}</td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-2 py-1 ${badgeClass} rounded font-bold">${promedio.toFixed(1)}</span>
+                    </td>
+                    <td class="px-6 py-4 text-center">${statusHtml}</td>
                 `;
-                
-                tr.innerHTML = html;
                 tbody.appendChild(tr);
             });
-        }
-
-        function renderHighlights() {
-            const sortedDesc = [...filteredData].sort((a,b) => (b._promedio || 0) - (a._promedio || 0));
+           }
+           function renderHighlights() {
+            const sortedDesc = [...globalAggregatedPeople].sort((a,b) => (b.avg || 0) - (a.avg || 0));
             
             const topList = document.getElementById('topPerformersList');
             const needsHelpList = document.getElementById('needsHelpList');
@@ -539,26 +504,25 @@
 
             // Top 3
             sortedDesc.slice(0,3).forEach(r => {
-                if(r._promedio >= 13) {
+                if(r.avg >= 13) {
                     topList.innerHTML += `<li class="flex justify-between items-center">
-                        <span class="truncate pr-2">${r['Nombres'] || r['Nombre']}</span>
-                        <span class="font-bold text-slate-800">${r._promedio.toFixed(1)}</span>
+                        <span class="truncate pr-2">${r.name}</span>
+                        <span class="font-bold text-slate-800">${r.avg.toFixed(1)}</span>
                     </li>`;
                 }
             });
 
             // Bottom
-            const bottom = sortedDesc.filter(r => r._promedio < 13 && r._promedio > 0).slice(0,3);
-            if(bottom.length > 0) {
-                bottom.forEach(r => {
-                    needsHelpList.innerHTML += `<li class="flex justify-between items-center">
-                        <span class="truncate pr-2">${r['Nombres'] || r['Nombre']}</span>
-                        <span class="font-bold text-red-600">${r._promedio.toFixed(1)}</span>
-                    </li>`;
-                });
-            } else {
-                needsHelpList.innerHTML = '<li class="text-slate-400 italic">No hay desaprobados. ¡Excelente!</li>';
-            }
+            const bottom = sortedDesc.filter(r => r.avg < 13 && r.avg > 0).slice(0,3);
+            bottom.forEach(r => {
+                needsHelpList.innerHTML += `<li class="flex justify-between items-center">
+                    <span class="truncate pr-2 text-slate-600">${r.name}</span>
+                    <span class="font-bold text-red-600 bg-red-50 px-2 rounded">${r.avg.toFixed(1)}</span>
+                </li>`;
+            });
+
+            if (topList.innerHTML === '') topList.innerHTML = '<li class="text-slate-400 text-sm italic">No hay datos suficientes</li>';
+            if (needsHelpList.innerHTML === '') needsHelpList.innerHTML = '<li class="text-slate-400 text-sm italic">Todos aprobados, ¡excelente!</li>';
         }
 
         // --- MOCK DATA FOR DEMO PURPOSES ---
