@@ -381,6 +381,7 @@
                     dni: getIndex(['dni', 'documento', 'identidad'], 8),
                     apellidos: getIndex(['apellidos', 'last name'], 11),
                     nombres: getIndex(['nombres', 'first name', 'nombre completo'], 14),
+                    defaultName: getIndex(['nombre de usuario', 'nombre forms'], 4),
                     empresa: getIndex(['selecciona a la empresa', 'empresa', 'agencia', 'socio'], 17),
                     area: getIndex(['area', 'área', 'área de trabajo'], 20),
                     cargo: getIndex(['cargo', 'puesto', 'rol'], 23),
@@ -447,7 +448,16 @@
                 let dni = map.dni !== -1 && row[map.dni] ? String(row[map.dni]).trim() : 'Sin DNI';
                 let fName = map.nombres !== -1 && row[map.nombres] ? String(row[map.nombres]).trim() : '';
                 let lName = map.apellidos !== -1 && row[map.apellidos] ? String(row[map.apellidos]).trim() : '';
-                let fullName = (fName + " " + lName).trim() || 'Desconocido';
+                let fullName = '';
+                if (fName || lName) {
+                    fullName = `${fName} ${lName}`.trim();
+                } else {
+                    fullName = map.defaultName !== -1 && row[map.defaultName] ? String(row[map.defaultName]).trim() : 'Anónimo';
+                }
+                
+                let currentAgency = map.empresa !== -1 && row[map.empresa] ? String(row[map.empresa]).trim().toUpperCase() : '';
+                if (fullName === 'Anónimo' && !currentAgency) return;
+                currentAgency = currentAgency || 'SIN AGENCIA';
                 
                 let cargo = map.cargo !== -1 && row[map.cargo] ? String(row[map.cargo]).trim() : '-';
                 
@@ -461,11 +471,11 @@
                 if (isNaN(score)) score = 0;
 
                 let course = map.topic !== -1 && row[map.topic] ? String(row[map.topic]).trim() : 'General';
+                let classCode = map.classCode !== -1 && row[map.classCode] ? String(row[map.classCode]).trim() : '';
                 let dateVal = map.date !== -1 && row[map.date] ? String(row[map.date]).trim() : '';
-                let currentAgency = map.empresa !== -1 && row[map.empresa] ? String(row[map.empresa]).trim().toUpperCase() : 'SIN AGENCIA';
 
-                // Group evaluations to match index.html
-                const key = fullName.toLowerCase() + '|' + course.toLowerCase() + '|' + dateVal;
+                // Group evaluations to match index.html exactly
+                const key = fullName.toLowerCase() + '|' + classCode.toLowerCase() + '|' + course.toLowerCase() + '|' + dateVal;
                 
                 if (!tempGrouped[key]) {
                     tempGrouped[key] = {
@@ -795,7 +805,7 @@
             const lowest = sorted[0];
 
             if (lowest && lowest.avg < passScore) {
-                document.getElementById('criticalCourseText').innerHTML = `El curso <strong>${lowest.course}</strong> tiene el promedio más bajo de la agencia (<strong>${lowest.avg.toFixed(1)}</strong>). Te recomendamos reforzar esta capacitación.`;
+                document.getElementById('criticalCourseText').innerHTML = `Están por debajo del promedio mínimo de <strong>${passScore}</strong>, se recomienda reforzar los temas tratados en la sesión.`;
                 alertEl.classList.remove('hidden');
             } else {
                 alertEl.classList.add('hidden');
