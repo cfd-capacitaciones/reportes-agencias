@@ -472,7 +472,11 @@
 
                 let course = map.topic !== -1 && row[map.topic] ? String(row[map.topic]).trim() : 'General';
                 let classCode = map.classCode !== -1 && row[map.classCode] ? String(row[map.classCode]).trim() : '';
-                let dateVal = map.date !== -1 && row[map.date] ? String(row[map.date]).trim() : '';
+                
+                let dateVal = 'Sin fecha';
+                if (map.date !== -1 && row[map.date]) {
+                    dateVal = String(row[map.date]).trim().split(' ')[0];
+                }
 
                 // Group evaluations to match index.html exactly
                 const key = fullName.toLowerCase() + '|' + classCode.toLowerCase() + '|' + course.toLowerCase() + '|' + dateVal;
