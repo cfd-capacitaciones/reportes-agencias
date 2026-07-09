@@ -279,6 +279,7 @@
         let filters = {}; 
         let globalAggregatedPeople = []; 
         let globalCourseAverages = [];   
+        let passScore = 13;
 
         // Initialize App
         document.addEventListener('DOMContentLoaded', () => {
@@ -304,9 +305,11 @@
                 if (decodedToken.startsWith('{')) {
                     filters = JSON.parse(decodedToken);
                     agencyName = filters.agency;
+                    passScore = parseInt(filters.passingScore) || 13;
                 } else {
                     agencyName = decodedToken;
                     filters = {};
+                    passScore = 13;
                 }
                 
                 document.getElementById('agencyNameBadge').classList.remove('hidden');
@@ -506,7 +509,7 @@
         function calculateKPIs() {
             if (globalAggregatedPeople.length === 0) return;
 
-            const uniqueUsersSet = new Set(globalAggregatedPeople.map(p => p.dni || p.name));
+            const uniqueUsersSet = new Set(globalAggregatedPeople.map(p => (p.dni && p.dni !== 'Sin DNI' && p.dni !== '0') ? p.dni : p.name));
             if(document.getElementById('kpiUniqueUsers')) {
                 document.getElementById('kpiUniqueUsers').textContent = uniqueUsersSet.size;
             }
@@ -518,7 +521,7 @@
 
             globalAggregatedPeople.forEach(p => {
                 totalAvgSum += p.avg;
-                const key = p.dni || p.name;
+                const key = (p.dni && p.dni !== 'Sin DNI' && p.dni !== '0') ? p.dni : p.name;
                 if(!participantScores[key]) {
                     participantScores[key] = { sum: 0, count: 0 };
                 }
@@ -528,7 +531,7 @@
 
             let passedCount = 0;
             Object.values(participantScores).forEach(u => {
-                if ((u.sum / u.count) >= 13) {
+                if ((u.sum / u.count) >= passScore) {
                     passedCount++;
                 }
             });
@@ -606,7 +609,7 @@
                 globalAggregatedPeople.forEach(p => {
                     if (!agencyStats[p.agency]) agencyStats[p.agency] = { sob: 0, reg: 0, def: 0 };
                     if (p.avg >= 18) agencyStats[p.agency].sob++;
-                    else if (p.avg >= 14) agencyStats[p.agency].reg++;
+                    else if (p.avg >= passScore) agencyStats[p.agency].reg++;
                     else agencyStats[p.agency].def++;
                 });
 
@@ -636,14 +639,14 @@
                 let sobresaliente = 0; let regular = 0; let deficiente = 0;
                 globalAggregatedPeople.forEach(p => {
                     if (p.avg >= 18) sobresaliente++;
-                    else if (p.avg >= 14) regular++;
+                    else if (p.avg >= passScore) regular++;
                     else deficiente++;
                 });
 
                 distChartInstance = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
-                        labels: ['Sobresaliente (18-20)', 'Regular (14-17)', 'Deficiente (0-13)'],
+                        labels: ['Sobresaliente (18-20)', `Regular (${passScore}-17)`, `Deficiente (0-${passScore-1})`],
                         datasets: [{
                             data: [sobresaliente, regular, deficiente],
                             backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
@@ -774,7 +777,7 @@
             const sorted = [...globalCourseAverages].sort((a,b) => a.avg - b.avg);
             const lowest = sorted[0];
 
-            if (lowest && lowest.avg < 14) {
+            if (lowest && lowest.avg < passScore) {
                 document.getElementById('criticalCourseText').innerHTML = `El curso <strong>${lowest.course}</strong> tiene el promedio más bajo de la agencia (<strong>${lowest.avg.toFixed(1)}</strong>). Te recomendamos reforzar esta capacitación.`;
                 alertEl.classList.remove('hidden');
             } else {
@@ -815,10 +818,10 @@
 
             const searchLower = searchTerm.toLowerCase();
             const rowsToRender = globalAggregatedPeople.filter(p => 
-                p.dni.toLowerCase().includes(searchLower) ||
-                p.name.toLowerCase().includes(searchLower) ||
-                (p.cargo && p.cargo.toLowerCase().includes(searchLower)) ||
-                (p.agency && p.agency.toLowerCase().includes(searchLower))
+                (p.dni && String(p.dni).toLowerCase().includes(searchLower)) ||
+                (p.name && String(p.name).toLowerCase().includes(searchLower)) ||
+                (p.cargo && String(p.cargo).toLowerCase().includes(searchLower)) ||
+                (p.agency && String(p.agency).toLowerCase().includes(searchLower))
             );
 
             if (rowsToRender.length === 0) {
@@ -829,11 +832,11 @@
 
             rowsToRender.forEach(p => {
                 const promedio = p.avg;
-                const statusHtml = promedio >= 14 ? 
+                const statusHtml = promedio >= passScore ? 
                     '<span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">Aprobado</span>' : 
                     '<span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">Desaprobado</span>';
 
-                let badgeClass = promedio >= 14 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+                let badgeClass = promedio >= passScore ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
                 
                 let agencyCol = !agencyName ? `<td class="p-3 text-slate-600 text-sm font-semibold">${p.agency}</td>` : '';
 
@@ -878,7 +881,7 @@
             });
 
             // Needs Help
-            const failed = sortedDesc.filter(r => r.avg < 13).reverse().slice(0,3);
+            const failed = sortedDesc.filter(r => r.avg < passScore).reverse().slice(0,3);
             failed.forEach(r => {
                 let dispName = !agencyName ? `${r.name} <span class="text-[10px] text-slate-400 font-normal">(${r.agency})</span>` : r.name;
                 needsHelpList.innerHTML += `<li class="flex justify-between items-center">

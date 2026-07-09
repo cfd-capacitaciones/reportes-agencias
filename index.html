@@ -1004,7 +1004,8 @@
                             classCode: document.getElementById('filter-class-code') ? document.getElementById('filter-class-code').value : '',
                             lugar: document.getElementById('filter-lugar') ? document.getElementById('filter-lugar').value : '',
                             dateStart: document.getElementById('filter-date-start') ? document.getElementById('filter-date-start').value : '',
-                            dateEnd: document.getElementById('filter-date-end') ? document.getElementById('filter-date-end').value : ''
+                            dateEnd: document.getElementById('filter-date-end') ? document.getElementById('filter-date-end').value : '',
+                            passingScore: parseInt(document.getElementById('passing-score').value) || 13
                         };
                         const token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
                         const separator = cleanBaseUrl.includes('?') ? '&' : '?';
@@ -1046,7 +1047,7 @@
                     }
 
                     const cleanBaseUrl = userBaseUrl.split('?')[0].split('#')[0];
-                    const payload = { agency: chanFilter, topic: topicFilter, area: areaFilter, classCode: classCodeFilter, lugar: lugarFilter, dateStart: dateStart, dateEnd: dateEnd };
+                    const payload = { agency: chanFilter, topic: topicFilter, area: areaFilter, classCode: classCodeFilter, lugar: lugarFilter, dateStart: dateStart, dateEnd: dateEnd, passingScore: parseInt(document.getElementById('passing-score').value) || 13 };
                     const token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
                     const separator = cleanBaseUrl.includes('?') ? '&' : '?';
                     const magicLink = `${cleanBaseUrl}${separator}token=${token}`;
