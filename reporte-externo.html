@@ -280,6 +280,21 @@
         let globalAggregatedPeople = []; 
         let globalCourseAverages = [];   
         let passScore = 13;
+        
+        // Sorting state
+        let sortKey = 'name';
+        let sortAsc = true;
+
+        function sortResponses(key) {
+            if (sortKey === key) {
+                sortAsc = !sortAsc;
+            } else {
+                sortKey = key;
+                sortAsc = true;
+            }
+            const searchTerm = document.getElementById('searchInput') ? document.getElementById('searchInput').value : '';
+            renderTable(searchTerm);
+        }
 
         // Initialize App
         document.addEventListener('DOMContentLoaded', () => {
@@ -824,23 +839,23 @@
             // Set headers based on global view
             if (!agencyName) {
                 theadRow.innerHTML = `
-                    <th class="pb-3 text-left font-semibold text-slate-600 pl-3">Nombre</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">Agencia</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">Cargo</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">DNI</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">Capacitación</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">Fecha</th>
-                    <th class="pb-3 text-center font-semibold text-slate-600">Nota</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 pl-3 cursor-pointer select-none" onclick="sortResponses('name')">Nombre <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('agency')">Agencia <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('cargo')">Cargo <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('dni')">DNI <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('course')">Capacitación <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('date')">Fecha <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-center font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('avg')">Nota <i class="fa-solid fa-sort text-slate-300"></i></th>
                     <th class="p-3 text-center">Estado</th>
                 `;
             } else {
                 theadRow.innerHTML = `
-                    <th class="pb-3 text-left font-semibold text-slate-600 pl-3">Nombre</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">Cargo</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">DNI</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">Capacitación</th>
-                    <th class="pb-3 text-left font-semibold text-slate-600">Fecha</th>
-                    <th class="pb-3 text-center font-semibold text-slate-600">Nota</th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 pl-3 cursor-pointer select-none" onclick="sortResponses('name')">Nombre <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('cargo')">Cargo <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('dni')">DNI <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('course')">Capacitación <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-left font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('date')">Fecha <i class="fa-solid fa-sort text-slate-300"></i></th>
+                    <th class="pb-3 text-center font-semibold text-slate-600 cursor-pointer select-none" onclick="sortResponses('avg')">Nota <i class="fa-solid fa-sort text-slate-300"></i></th>
                     <th class="p-3 text-center">Estado</th>
                 `;
             }
@@ -848,12 +863,25 @@
             tbody.innerHTML = '';
 
             const searchLower = searchTerm.toLowerCase();
-            const rowsToRender = globalAggregatedPeople.filter(p => 
+            let rowsToRender = globalAggregatedPeople.filter(p => 
                 (p.dni && String(p.dni).toLowerCase().includes(searchLower)) ||
                 (p.name && String(p.name).toLowerCase().includes(searchLower)) ||
                 (p.cargo && String(p.cargo).toLowerCase().includes(searchLower)) ||
                 (p.agency && String(p.agency).toLowerCase().includes(searchLower))
             );
+
+            rowsToRender.sort((a, b) => {
+                let valA = a[sortKey];
+                let valB = b[sortKey];
+
+                if (typeof valA === 'string' || typeof valB === 'string') {
+                    valA = String(valA || '');
+                    valB = String(valB || '');
+                    return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                } else {
+                    return sortAsc ? (valA || 0) - (valB || 0) : (valB || 0) - (valA || 0);
+                }
+            });
 
             if (rowsToRender.length === 0) {
                 const colspan = !agencyName ? 8 : 7;
