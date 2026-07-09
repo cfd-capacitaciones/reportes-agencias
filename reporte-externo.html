@@ -440,6 +440,7 @@
             }
 
             let coursesMap = {};
+            let tempGrouped = {};
             globalAggregatedPeople = [];
 
             filteredData.forEach(row => {
@@ -463,17 +464,24 @@
                 let dateVal = map.date !== -1 && row[map.date] ? String(row[map.date]).trim() : '';
                 let currentAgency = map.empresa !== -1 && row[map.empresa] ? String(row[map.empresa]).trim().toUpperCase() : 'SIN AGENCIA';
 
-                // Push every single evaluation as an individual record
-                globalAggregatedPeople.push({
-                    dni: dni,
-                    name: fullName,
-                    cargo: cargo,
-                    course: course,
-                    date: dateVal,
-                    agency: currentAgency,
-                    evalsCount: 1, // It's a single evaluation
-                    avg: score // The score of this specific evaluation
-                });
+                // Group evaluations to match index.html
+                const key = fullName.toLowerCase() + '|' + course.toLowerCase() + '|' + dateVal;
+                
+                if (!tempGrouped[key]) {
+                    tempGrouped[key] = {
+                        dni: dni,
+                        name: fullName,
+                        cargo: cargo,
+                        course: course,
+                        date: dateVal,
+                        agency: currentAgency,
+                        evalsCount: 1,
+                        scoreSum: score
+                    };
+                } else {
+                    tempGrouped[key].evalsCount++;
+                    tempGrouped[key].scoreSum += score;
+                }
 
                 // We still want to group courses for the chart
                 if(!coursesMap[course]) {
@@ -481,6 +489,14 @@
                 }
                 coursesMap[course].totalScore += score;
                 coursesMap[course].count += 1;
+            });
+
+            globalAggregatedPeople = Object.values(tempGrouped).map(g => {
+                const avgScore = g.evalsCount > 0 ? (g.scoreSum / g.evalsCount) : 0;
+                return {
+                    ...g,
+                    avg: Math.round(avgScore * 100) / 100
+                };
             });
 
             globalCourseAverages = Object.values(coursesMap).map(c => ({
@@ -509,19 +525,20 @@
         function calculateKPIs() {
             if (globalAggregatedPeople.length === 0) return;
 
-            const uniqueUsersSet = new Set(globalAggregatedPeople.map(p => (p.dni && p.dni !== 'Sin DNI' && p.dni !== '0') ? p.dni : p.name));
+            const uniqueUsersSet = new Set(globalAggregatedPeople.map(p => p.name || p.dni));
             if(document.getElementById('kpiUniqueUsers')) {
                 document.getElementById('kpiUniqueUsers').textContent = uniqueUsersSet.size;
             }
 
-            document.getElementById('kpiTotalUsers').textContent = globalAggregatedPeople.length;
+            const totalEvals = globalAggregatedPeople.reduce((sum, p) => sum + (p.evalsCount || 1), 0);
+            document.getElementById('kpiTotalUsers').textContent = totalEvals;
 
             let totalAvgSum = 0;
             const participantScores = {};
 
             globalAggregatedPeople.forEach(p => {
                 totalAvgSum += p.avg;
-                const key = (p.dni && p.dni !== 'Sin DNI' && p.dni !== '0') ? p.dni : p.name;
+                const key = p.name || p.dni;
                 if(!participantScores[key]) {
                     participantScores[key] = { sum: 0, count: 0 };
                 }
