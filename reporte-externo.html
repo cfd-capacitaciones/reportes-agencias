@@ -243,9 +243,15 @@
             <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                 <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h3 class="text-lg font-outfit font-bold text-slate-800">Detalle de Evaluaciones</h3>
-                    <div class="relative">
-                        <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
-                        <input type="text" id="searchInput" placeholder="Buscar por DNI o Nombre..." class="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-win-orange focus:border-win-orange text-sm w-full sm:w-64">
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <select id="viewModeToggle" class="border border-slate-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-win-orange text-slate-700 font-medium">
+                            <option value="participants">Total Participantes</option>
+                            <option value="evaluations">Total Evaluaciones (Repetidos)</option>
+                        </select>
+                        <div class="relative">
+                            <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="searchInput" placeholder="Buscar por DNI o Nombre..." class="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-win-orange focus:border-win-orange text-sm w-full sm:w-64">
+                        </div>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -278,6 +284,8 @@
         let agencyName = '';
         let filters = {}; 
         let globalAggregatedPeople = []; 
+        let globalRepeatedEvaluations = [];
+        let currentViewMode = 'participants';
         let globalCourseAverages = [];   
         let passScore = 13;
         
@@ -302,6 +310,12 @@
             
             document.getElementById('searchInput').addEventListener('input', (e) => {
                 renderTable(e.target.value);
+            });
+
+            document.getElementById('viewModeToggle').addEventListener('change', (e) => {
+                currentViewMode = e.target.value;
+                const searchTerm = document.getElementById('searchInput') ? document.getElementById('searchInput').value : '';
+                renderTable(searchTerm);
             });
         });
 
@@ -507,11 +521,19 @@
                         date: dateVal,
                         agency: currentAgency,
                         evalsCount: 1,
-                        scoreSum: score
+                        scoreSum: score,
+                        rawRows: [{
+                            dni: dni, name: fullName, cargo: cargo, 
+                            course: course, date: dateVal, agency: currentAgency, avg: score
+                        }]
                     };
                 } else {
                     tempGrouped[key].evalsCount++;
                     tempGrouped[key].scoreSum += score;
+                    tempGrouped[key].rawRows.push({
+                        dni: dni, name: fullName, cargo: cargo, 
+                        course: course, date: dateVal, agency: currentAgency, avg: score
+                    });
                 }
 
                 // We still want to group courses for the chart
@@ -528,6 +550,13 @@
                     ...g,
                     avg: Math.round(avgScore * 100) / 100
                 };
+            });
+
+            globalRepeatedEvaluations = [];
+            Object.values(tempGrouped).forEach(g => {
+                if (g.evalsCount > 1) {
+                    globalRepeatedEvaluations.push(...g.rawRows);
+                }
             });
 
             globalCourseAverages = Object.values(coursesMap).map(c => ({
@@ -865,7 +894,8 @@
             tbody.innerHTML = '';
 
             const searchLower = searchTerm.toLowerCase();
-            let rowsToRender = globalAggregatedPeople.filter(p => 
+            let sourceData = currentViewMode === 'evaluations' ? globalRepeatedEvaluations : globalAggregatedPeople;
+            let rowsToRender = sourceData.filter(p => 
                 (p.dni && String(p.dni).toLowerCase().includes(searchLower)) ||
                 (p.name && String(p.name).toLowerCase().includes(searchLower)) ||
                 (p.cargo && String(p.cargo).toLowerCase().includes(searchLower)) ||
