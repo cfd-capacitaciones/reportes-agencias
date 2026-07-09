@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reporte de Agencia | WIN Empresas</title>
+    <!-- Basic Security -->
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.onkeydown = function(e) {
+            if(e.keyCode == 123) return false; // F12
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false; // Ctrl+Shift+I
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) return false; // Ctrl+Shift+C
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false; // Ctrl+Shift+J
+            if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false; // Ctrl+U
+        };
+    </script>
     <!-- Google Fonts: Outfit & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -383,6 +394,62 @@
                 });
         }
 
+        function parseExcelDateTime(val) {
+            if (!val) return null;
+            if (val instanceof Date) return val;
+            
+            // Try standard Date parsing
+            let parsed = new Date(val);
+            if (!isNaN(parsed.getTime())) return parsed;
+            
+            // Fallback manual parsing
+            const str = String(val).trim();
+            const parts = str.split(' ');
+            if (parts.length >= 2) {
+                const datePart = parts[0]; 
+                const timePart = parts[1]; 
+                
+                const dateParts = datePart.split('/');
+                const timeParts = timePart.split(':');
+                
+                if (dateParts.length === 3 && timeParts.length >= 2) {
+                    let month = parseInt(dateParts[0]) - 1; // 0-indexed
+                    let day = parseInt(dateParts[1]);
+                    let year = parseInt(dateParts[2]);
+                    if (year < 100) year += 2000;
+                    
+                    if (month > 11) { // swap day and month if month > 12
+                        const temp = month + 1;
+                        month = day - 1;
+                        day = temp;
+                    }
+                    
+                    const hours = parseInt(timeParts[0]) || 0;
+                    const minutes = parseInt(timeParts[1]) || 0;
+                    const seconds = parseInt(timeParts[2]) || 0;
+                    
+                    parsed = new Date(year, month, day, hours, minutes, seconds);
+                    if (!isNaN(parsed.getTime())) return parsed;
+                }
+            } else if (parts.length === 1 && parts[0].includes('/')) {
+                const dateParts = parts[0].split('/');
+                if (dateParts.length === 3) {
+                    let month = parseInt(dateParts[0]) - 1;
+                    let day = parseInt(dateParts[1]);
+                    let year = parseInt(dateParts[2]);
+                    if (year < 100) year += 2000;
+                    if (month > 11) {
+                        const temp = month + 1;
+                        month = day - 1;
+                        day = temp;
+                    }
+                    parsed = new Date(year, month, day);
+                    if (!isNaN(parsed.getTime())) return parsed;
+                }
+            }
+            return null;
+        }
+
         function processData(data) {
             try {
                 if (!data || data.length < 2) {
@@ -505,7 +572,15 @@
                 
                 let dateVal = 'Sin fecha';
                 if (map.date !== -1 && row[map.date]) {
-                    dateVal = String(row[map.date]).trim().split(' ')[0];
+                    let parsedDate = parseExcelDateTime(row[map.date]);
+                    if (parsedDate && !isNaN(parsedDate.getTime())) {
+                        let dd = String(parsedDate.getDate()).padStart(2, '0');
+                        let mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                        let yyyy = parsedDate.getFullYear();
+                        dateVal = `${dd}/${mm}/${yyyy}`;
+                    } else {
+                        dateVal = String(row[map.date]).trim().split(' ')[0];
+                    }
                 }
 
                 // Group evaluations to match index.html exactly

@@ -1541,8 +1541,12 @@
                 let dateVal = row[map.date];
                 let formattedDate = 'Sin fecha';
                 if (dateVal) {
-                    if (dateVal instanceof Date) {
-                        formattedDate = dateVal.toLocaleDateString('es-PE');
+                    let parsedDate = parseExcelDateTime(dateVal);
+                    if (parsedDate && !isNaN(parsedDate.getTime())) {
+                        let dd = String(parsedDate.getDate()).padStart(2, '0');
+                        let mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                        let yyyy = parsedDate.getFullYear();
+                        formattedDate = `${dd}/${mm}/${yyyy}`;
                     } else {
                         formattedDate = String(dateVal).split(' ')[0];
                     }
@@ -2177,6 +2181,21 @@
                     const seconds = parseInt(timeParts[2]) || 0;
                     
                     parsed = new Date(year, month, day, hours, minutes, seconds);
+                    if (!isNaN(parsed.getTime())) return parsed;
+                }
+            } else if (parts.length === 1 && parts[0].includes('/')) {
+                const dateParts = parts[0].split('/');
+                if (dateParts.length === 3) {
+                    let month = parseInt(dateParts[0]) - 1;
+                    let day = parseInt(dateParts[1]);
+                    let year = parseInt(dateParts[2]);
+                    if (year < 100) year += 2000;
+                    if (month > 11) {
+                        const temp = month + 1;
+                        month = day - 1;
+                        day = temp;
+                    }
+                    parsed = new Date(year, month, day);
                     if (!isNaN(parsed.getTime())) return parsed;
                 }
             }
