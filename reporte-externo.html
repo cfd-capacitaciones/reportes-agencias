@@ -128,8 +128,18 @@
                 </div>
             </div>
 
-            <!-- KPIs -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- KPI CARDS -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Participantes</h3>
+                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
+                            <i class="fa-solid fa-user-check"></i>
+                        </div>
+                    </div>
+                    <div class="text-3xl font-bold text-slate-800" id="kpiUniqueUsers">0</div>
+                </div>
+
                 <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-win-orange hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Evaluaciones</h3>
@@ -495,6 +505,11 @@
 
         function calculateKPIs() {
             if (globalAggregatedPeople.length === 0) return;
+
+            const uniqueUsersSet = new Set(globalAggregatedPeople.map(p => p.dni || p.name));
+            if(document.getElementById('kpiUniqueUsers')) {
+                document.getElementById('kpiUniqueUsers').textContent = uniqueUsersSet.size;
+            }
 
             document.getElementById('kpiTotalUsers').textContent = globalAggregatedPeople.length;
 

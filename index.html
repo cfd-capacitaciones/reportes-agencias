@@ -353,30 +353,30 @@
 
         <!-- ROW 2: KEY PERFORMANCE INDICATORS (KPIs) -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <!-- KPI 1: COBERTURA DE SOCIOS/AGENCIAS -->
+            <!-- KPI 1: TOTAL PARTICIPANTES (ÚNICOS) -->
             <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4 flex flex-col justify-between min-h-[110px] relative overflow-hidden group">
                 <div class="absolute -right-3 -top-3 w-16 h-16 bg-orange-50/50 rounded-full flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
-                    <i class="fa-solid fa-building-shield text-win-orange/20 text-2xl"></i>
+                    <i class="fa-solid fa-users text-win-orange/20 text-2xl"></i>
                 </div>
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">Cobertura de Agencias</span>
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Participantes</span>
                 <div class="my-2 flex flex-col">
-                    <span id="kpi-coverage" class="font-outfit text-2xl md:text-3xl font-extrabold text-win-navy">0.0%</span>
-                    <span id="kpi-coverage-sub" class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">0 de 0 Agencias Activas</span>
+                    <span id="kpi-participants" class="font-outfit text-2xl md:text-3xl font-extrabold text-win-navy">0</span>
+                    <span id="kpi-participants-sub" class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">Personas únicas evaluadas</span>
                 </div>
                 <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                    <div id="kpi-coverage-bar" class="bg-win-orange h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    <div id="kpi-participants-bar" class="bg-win-orange h-1.5 rounded-full transition-all duration-500" style="width: 100%"></div>
                 </div>
             </div>
 
-            <!-- KPI 2: TOTAL EVALUADOS -->
+            <!-- KPI 2: TOTAL EVALUACIONES -->
             <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4 flex flex-col justify-between min-h-[110px] relative overflow-hidden group">
                 <div class="absolute -right-3 -top-3 w-16 h-16 bg-blue-50/50 rounded-full flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
-                    <i class="fa-solid fa-users text-sky-600/10 text-2xl"></i>
+                    <i class="fa-solid fa-file-signature text-sky-600/10 text-2xl"></i>
                 </div>
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Evaluados</span>
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Evaluaciones</span>
                 <div class="my-2 flex flex-col">
                     <span id="kpi-attendance" class="font-outfit text-2xl md:text-3xl font-extrabold text-win-navy">0</span>
-                    <span id="kpi-attendance-sub" class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">Participaciones totales</span>
+                    <span id="kpi-attendance-sub" class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">Exámenes registrados</span>
                 </div>
                 <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
                     <div id="kpi-attendance-bar" class="bg-sky-500 h-1.5 rounded-full transition-all duration-500" style="width: 100%"></div>
@@ -2214,17 +2214,10 @@
         function drawKPIs(agencyAnalysis) {
             const activeList = filteredResponses.length > 0 ? filteredResponses : responses;
 
-            // Cobertura Roster/Agencias KPI
-            if (activeAgencies.length > 0) {
-                const covPct = agencyAnalysis.agencyCoveragePct;
-                document.getElementById('kpi-coverage').innerText = `${covPct.toFixed(1)}%`;
-                document.getElementById('kpi-coverage-sub').innerText = `${agencyAnalysis.participatingCount} de ${agencyAnalysis.totalActiveCount} Agencias`;
-                document.getElementById('kpi-coverage-bar').style.width = `${covPct}%`;
-            } else {
-                document.getElementById('kpi-coverage').innerText = "0.0%";
-                document.getElementById('kpi-coverage-sub').innerText = "Cargue '01 Lista agencias.xlsx'";
-                document.getElementById('kpi-coverage-bar').style.width = "0%";
-            }
+            // Total Participantes (Únicos) KPI
+            const uniqueParticipants = new Set(activeList.map(r => r.name || r.dni));
+            document.getElementById('kpi-participants').innerText = uniqueParticipants.size;
+            document.getElementById('kpi-participants-sub').innerText = `Personas únicas evaluadas`;
 
             // Total Evaluados KPI
             document.getElementById('kpi-attendance').innerText = activeList.length;
@@ -2346,9 +2339,25 @@
                 lowTopicsContainer.innerHTML = '<div class="text-emerald-600 font-medium flex items-center gap-1 text-[11px]"><i class="fa-solid fa-circle-check"></i> Buen desempeño general en todos los temas.</div>';
             }
 
-            // 3. Lowest score agents
-            const failedAgents = activeList
-                .filter(r => r.score < passingScore)
+            // 3. Lowest score agents (Promedio por participante)
+            const agentScores = {};
+            activeList.forEach(r => {
+                const key = r.name || r.dni;
+                if (!agentScores[key]) {
+                    agentScores[key] = { name: r.name, channel: r.channel, topic: r.topic, sum: 0, cnt: 0 };
+                }
+                agentScores[key].sum += r.score;
+                agentScores[key].cnt++;
+            });
+
+            const failedAgents = Object.values(agentScores)
+                .map(data => ({
+                    name: data.name,
+                    channel: data.channel,
+                    topic: data.cnt > 1 ? 'Varias Evaluaciones' : data.topic,
+                    score: data.sum / data.cnt
+                }))
+                .filter(a => a.score < passingScore)
                 .sort((a,b) => a.score - b.score)
                 .slice(0, 5);
 
