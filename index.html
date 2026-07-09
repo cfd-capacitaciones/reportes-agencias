@@ -1486,6 +1486,7 @@
                 email: getIndex(['correo electrónico', 'correo electronico', 'email'], 3),
                 defaultName: getIndex(['nombre de usuario', 'nombre forms'], 4),
                 score: getIndex(['total de puntos', 'puntos', 'calificación', 'nota', 'score'], 5),
+                dni: getIndex(['documento de identida', 'dni', 'ce', 'ingresar tu numero'], 8),
                 apellidos: getIndex(['apellidos', 'last name'], 11),
                 nombres: getIndex(['nombres', 'first name', 'nombre completo'], 14),
                 empresa: getIndex(['selecciona a la empresa', 'empresa', 'agencia', 'socio'], 17),
@@ -1570,6 +1571,7 @@
                 parsedResponses.push({
                     id: parsedResponses.length + 1,
                     name: name,
+                    dni: map.dni !== undefined ? String(row[map.dni] || '').trim() : '',
                     channel: String(row[map.empresa] || 'Sin Agencia').trim(),
                     area: String(row[map.area] || 'Sin Área').trim(),
                     cargo: String(row[map.cargo] || 'Sin Cargo').trim(),
@@ -1590,7 +1592,8 @@
 
             const grouped = {};
             parsedResponses.forEach(r => {
-                const key = (r.name || '').toLowerCase() + '|' + (r.classCode || '').toLowerCase() + '|' + (r.topic || '').toLowerCase() + '|' + (r.date || '');
+                let identifier = r.dni ? r.dni : (r.name || '').toLowerCase();
+                const key = identifier + '|' + (r.classCode || '').toLowerCase() + '|' + (r.topic || '').toLowerCase() + '|' + (r.date || '');
                 if (!grouped[key]) {
                     grouped[key] = { ...r, scoreSum: r.score, count: 1 };
                 } else {

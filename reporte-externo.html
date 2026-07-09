@@ -460,7 +460,8 @@
             globalAggregatedPeople = [];
 
             filteredData.forEach(row => {
-                let dni = map.dni !== -1 && row[map.dni] ? String(row[map.dni]).trim() : 'Sin DNI';
+                let dniRaw = map.dni !== -1 && row[map.dni] ? String(row[map.dni]).trim() : '';
+                let dni = dniRaw !== '' ? dniRaw : 'Sin DNI';
                 let fName = map.nombres !== -1 && row[map.nombres] ? String(row[map.nombres]).trim() : '';
                 let lName = map.apellidos !== -1 && row[map.apellidos] ? String(row[map.apellidos]).trim() : '';
                 let fullName = '';
@@ -494,7 +495,8 @@
                 }
 
                 // Group evaluations to match index.html exactly
-                const key = fullName.toLowerCase() + '|' + classCode.toLowerCase() + '|' + course.toLowerCase() + '|' + dateVal;
+                let identifier = dni !== 'Sin DNI' ? dni : fullName.toLowerCase();
+                const key = identifier + '|' + classCode.toLowerCase() + '|' + course.toLowerCase() + '|' + dateVal;
                 
                 if (!tempGrouped[key]) {
                     tempGrouped[key] = {
