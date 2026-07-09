@@ -132,7 +132,7 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Participantes</h3>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">TOTAL PARTICIPANTES</h3>
                         <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
                             <i class="fa-solid fa-user-check"></i>
                         </div>
@@ -142,7 +142,7 @@
 
                 <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-win-orange hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Evaluaciones</h3>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">TOTAL EVALUACIONES</h3>
                         <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-win-orange">
                             <i class="fa-solid fa-users"></i>
                         </div>
@@ -514,17 +514,27 @@
             document.getElementById('kpiTotalUsers').textContent = globalAggregatedPeople.length;
 
             let totalAvgSum = 0;
-            let passedCount = 0;
+            const participantScores = {};
 
             globalAggregatedPeople.forEach(p => {
                 totalAvgSum += p.avg;
-                if (p.avg >= 13) { 
+                const key = p.dni || p.name;
+                if(!participantScores[key]) {
+                    participantScores[key] = { sum: 0, count: 0 };
+                }
+                participantScores[key].sum += p.avg;
+                participantScores[key].count++;
+            });
+
+            let passedCount = 0;
+            Object.values(participantScores).forEach(u => {
+                if ((u.sum / u.count) >= 13) {
                     passedCount++;
                 }
             });
 
             const overallAvg = totalAvgSum / globalAggregatedPeople.length;
-            const passedRate = (passedCount / globalAggregatedPeople.length) * 100;
+            const passedRate = uniqueUsersSet.size > 0 ? (passedCount / uniqueUsersSet.size) * 100 : 0;
 
             document.getElementById('kpiAverage').textContent = overallAvg.toFixed(2);
             document.getElementById('kpiPassed').textContent = passedCount;

@@ -1615,7 +1615,7 @@
             responses = Object.values(grouped).map(g => {
                 const avgScore = g.count > 0 ? (g.scoreSum / g.count) : 0;
                 const roundedScore = Math.round(avgScore * 100) / 100;
-                const newR = { ...g, score: roundedScore };
+                const newR = { ...g, score: roundedScore, evalCount: g.count };
                 delete newR.scoreSum;
                 delete newR.count;
                 return newR;
@@ -2220,8 +2220,9 @@
             document.getElementById('kpi-participants-sub').innerText = `Personas únicas evaluadas`;
 
             // Total Evaluados KPI
-            document.getElementById('kpi-attendance').innerText = activeList.length;
-            document.getElementById('kpi-attendance-sub').innerText = `${activeList.length} evaluaciones registradas`;
+            const totalEvals = activeList.reduce((sum, r) => sum + (r.evalCount || 1), 0);
+            document.getElementById('kpi-attendance').innerText = totalEvals;
+            document.getElementById('kpi-attendance-sub').innerText = `${totalEvals} evaluaciones registradas`;
 
             // Average Score KPI
             let scoresSum = 0;
@@ -2245,14 +2246,25 @@
                 avgCard.className = "font-outfit text-2xl md:text-3xl font-extrabold text-rose-600";
             }
 
-            // Passing Rate KPI
-            let passedCount = 0;
+            // Passing Rate KPI (Por Participante Único)
+            const participantAvgs = {};
             activeList.forEach(r => {
-                if (r.score >= passingScore) passedCount++;
+                const key = r.name || r.dni;
+                if (!participantAvgs[key]) { participantAvgs[key] = { sum: 0, cnt: 0 }; }
+                participantAvgs[key].sum += r.score;
+                participantAvgs[key].cnt++;
             });
-            const passRate = scoreCount > 0 ? (passedCount / scoreCount) * 100 : 0;
+
+            let passedCount = 0;
+            const uniqueParticipantsArray = Array.from(uniqueParticipants);
+            uniqueParticipantsArray.forEach(p => {
+                if (participantAvgs[p] && (participantAvgs[p].sum / participantAvgs[p].cnt) >= passingScore) {
+                    passedCount++;
+                }
+            });
+            const passRate = uniqueParticipants.size > 0 ? (passedCount / uniqueParticipants.size) * 100 : 0;
             document.getElementById('kpi-pass-rate').innerText = `${passRate.toFixed(1)}%`;
-            document.getElementById('kpi-pass-sub').innerText = `${passedCount} Aprobados de ${scoreCount}`;
+            document.getElementById('kpi-pass-sub').innerText = `${passedCount} Aprobados de ${uniqueParticipants.size} personas`;
             document.getElementById('kpi-pass-bar').style.width = `${passRate}%`;
 
             // Duration & Refuerzos count KPI
