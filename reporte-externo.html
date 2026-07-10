@@ -490,7 +490,16 @@
 
                 let filteredData = rows.filter(row => {
                     let targetAgency = String(agencyName || '').trim().toUpperCase();
-                    let matchAgency = targetAgency === '' || (map.empresa !== -1 && String(row[map.empresa] || '').trim().toUpperCase() === targetAgency);
+                    let rowAgency = map.empresa !== -1 ? String(row[map.empresa] || '').trim().toUpperCase() : '';
+                    let matchAgency = false;
+                    
+                    if (filters && filters.allowedAgencies && filters.allowedAgencies.length > 0) {
+                        matchAgency = filters.allowedAgencies.map(a => String(a).toUpperCase()).includes(rowAgency);
+                    } else if (targetAgency !== '') {
+                        matchAgency = (rowAgency === targetAgency);
+                    } else {
+                        matchAgency = true;
+                    }
 
                     let targetTopic = String(filters.topic || '').trim().toUpperCase();
                     let matchTopic = targetTopic === '' || (map.topic !== -1 && String(row[map.topic] || '').trim().toUpperCase() === targetTopic);

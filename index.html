@@ -1047,7 +1047,24 @@
                     }
 
                     const cleanBaseUrl = userBaseUrl.split('?')[0].split('#')[0];
-                    const payload = { agency: chanFilter, topic: topicFilter, area: areaFilter, classCode: classCodeFilter, lugar: lugarFilter, dateStart: dateStart, dateEnd: dateEnd, passingScore: parseInt(document.getElementById('passing-score').value) || 13 };
+                    
+                    let allowed = [];
+                    const rosterUbicacion = document.getElementById('filter-roster-ubicacion') ? document.getElementById('filter-roster-ubicacion').value : '';
+                    if (rosterUbicacion || chanFilter) {
+                        allowed = [...new Set(filteredResponses.map(r => r.channel))].filter(Boolean);
+                    }
+
+                    const payload = { 
+                        agency: chanFilter, 
+                        allowedAgencies: allowed.length > 0 ? allowed : null,
+                        topic: topicFilter, 
+                        area: areaFilter, 
+                        classCode: classCodeFilter, 
+                        lugar: lugarFilter, 
+                        dateStart: dateStart, 
+                        dateEnd: dateEnd, 
+                        passingScore: parseInt(document.getElementById('passing-score').value) || 13 
+                    };
                     const token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
                     const separator = cleanBaseUrl.includes('?') ? '&' : '?';
                     const magicLink = `${cleanBaseUrl}${separator}token=${token}`;
@@ -1378,10 +1395,11 @@
             const urlInput = document.getElementById('google-sheets-url');
             let url = urlInput ? urlInput.value.trim() : '';
             
-            // Auto format URL if they paste the /edit URL
-            if (url.includes('/edit')) {
-                url = url.replace(/\/edit.*$/, '/gviz/tq?tqx=out:csv&gid=0');
-                urlInput.value = url; // Update input visibly
+            // Extraer el ID del documento y forzar el endpoint gviz (salta bloqueos CORS)
+            const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            if (match && match[1]) {
+                url = `https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?tqx=out:csv&gid=0`;
+                if (urlInput) urlInput.value = url; // Actualizar caja de texto
             }
 
             if (!url) {
