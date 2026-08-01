@@ -368,9 +368,9 @@
         }
 
         function fetchData() {
-            let finalUrl = GOOGLE_SHEETS_CSV_URL;
+            let finalUrl = (filters && filters.sheetUrl) ? filters.sheetUrl : GOOGLE_SHEETS_CSV_URL;
             if (window.location.protocol === 'file:') {
-                finalUrl = 'https://corsproxy.io/?' + encodeURIComponent(GOOGLE_SHEETS_CSV_URL);
+                finalUrl = 'https://corsproxy.io/?' + encodeURIComponent(finalUrl);
             }
             
             fetch(finalUrl)

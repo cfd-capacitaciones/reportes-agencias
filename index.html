@@ -1005,7 +1005,8 @@
                             lugar: document.getElementById('filter-lugar') ? document.getElementById('filter-lugar').value : '',
                             dateStart: document.getElementById('filter-date-start') ? document.getElementById('filter-date-start').value : '',
                             dateEnd: document.getElementById('filter-date-end') ? document.getElementById('filter-date-end').value : '',
-                            passingScore: parseInt(document.getElementById('passing-score').value) || 13
+                            passingScore: parseInt(document.getElementById('passing-score').value) || 13,
+                            sheetUrl: document.getElementById('google-sheets-url') ? document.getElementById('google-sheets-url').value.trim() : ''
                         };
                         const token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
                         const separator = cleanBaseUrl.includes('?') ? '&' : '?';
@@ -1063,7 +1064,8 @@
                         lugar: lugarFilter, 
                         dateStart: dateStart, 
                         dateEnd: dateEnd, 
-                        passingScore: parseInt(document.getElementById('passing-score').value) || 13 
+                        passingScore: parseInt(document.getElementById('passing-score').value) || 13,
+                        sheetUrl: document.getElementById('google-sheets-url') ? document.getElementById('google-sheets-url').value.trim() : ''
                     };
                     const token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
                     const separator = cleanBaseUrl.includes('?') ? '&' : '?';
