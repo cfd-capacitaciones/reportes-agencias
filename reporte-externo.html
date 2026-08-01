@@ -493,7 +493,7 @@
                     let rowAgency = map.empresa !== -1 ? String(row[map.empresa] || '').trim().toUpperCase() : '';
                     let matchAgency = false;
                     
-                    if (filters && filters.allowedAgencies && filters.allowedAgencies.length > 0) {
+                    if (filters && Array.isArray(filters.allowedAgencies) && filters.allowedAgencies.length > 0) {
                         matchAgency = filters.allowedAgencies.map(a => String(a).toUpperCase()).includes(rowAgency);
                     } else if (targetAgency !== '') {
                         matchAgency = (rowAgency === targetAgency);
