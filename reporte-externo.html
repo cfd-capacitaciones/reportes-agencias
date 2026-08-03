@@ -491,6 +491,8 @@
                 let filteredData = rows.filter(row => {
                     let targetAgency = String(agencyName || '').trim().toUpperCase();
                     let rowAgency = map.empresa !== -1 ? String(row[map.empresa] || '').trim().toUpperCase() : '';
+                    if (rowAgency === 'WIN') rowAgency = 'WIN EMPRESAS';
+                    
                     let matchAgency = false;
                     
                     if (filters && Array.isArray(filters.allowedAgencies) && filters.allowedAgencies.length > 0) {
@@ -499,6 +501,13 @@
                         matchAgency = (rowAgency === targetAgency);
                     } else {
                         matchAgency = true;
+                    }
+
+                    if (filters && filters.ubicacion) {
+                        let rowLugar = map.lugar !== -1 ? String(row[map.lugar] || '').trim().toLowerCase() : '';
+                        let isLima = rowLugar.includes('lima') || rowLugar.includes('callao');
+                        if (filters.ubicacion.toUpperCase() === 'LIMA' && !isLima) matchAgency = false;
+                        if (filters.ubicacion.toUpperCase() === 'PROVINCIA' && isLima) matchAgency = false;
                     }
 
                     let targetTopic = String(filters.topic || '').trim().toUpperCase();
