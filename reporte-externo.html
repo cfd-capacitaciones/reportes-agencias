@@ -495,191 +495,192 @@
                 };
 
                 let rows = data.slice(1);
+                let tempGrouped = {};
 
-                let filteredData = rows.filter(row => {
-                    let targetAgency = String(agencyName || '').trim().toUpperCase();
-                    let rowAgency = map.empresa !== -1 ? String(row[map.empresa] || '').trim().toUpperCase() : '';
+                rows.forEach(row => {
+                    let dniRaw = map.dni !== -1 && row[map.dni] ? String(row[map.dni]).trim() : '';
+                    let dni = dniRaw !== '' ? dniRaw : 'Sin DNI';
+                    let fName = map.nombres !== -1 && row[map.nombres] ? String(row[map.nombres]).trim() : '';
+                    let lName = map.apellidos !== -1 && row[map.apellidos] ? String(row[map.apellidos]).trim() : '';
+                    let fullName = '';
+                    if (fName || lName) {
+                        fullName = `${fName} ${lName}`.trim();
+                    } else {
+                        fullName = map.defaultName !== -1 && row[map.defaultName] ? String(row[map.defaultName]).trim() : 'Anónimo';
+                    }
+                    
+                    let rowAgency = map.empresa !== -1 && row[map.empresa] ? String(row[map.empresa]).trim().toUpperCase() : '';
                     if (!rowAgency) rowAgency = 'SIN AGENCIA';
                     if (rowAgency === 'WIN') rowAgency = 'WIN EMPRESAS';
                     
+                    if (fullName === 'Anónimo' && rowAgency === 'SIN AGENCIA') return;
+                    
+                    let course = map.topic !== -1 && row[map.topic] ? String(row[map.topic]).trim() : 'General';
+                    let classCode = map.classCode !== -1 && row[map.classCode] ? String(row[map.classCode]).trim() : '';
+
+                    let identifier = dni !== 'Sin DNI' ? dni : fullName.toLowerCase();
+                    const key = identifier + '|' + classCode.toLowerCase() + '|' + course.toLowerCase();
+                    
+                    let cargo = map.cargo !== -1 && row[map.cargo] ? String(row[map.cargo]).trim() : '-';
+                    let rowLugar = map.lugar !== -1 ? String(row[map.lugar] || '').trim() : '';
+                    let rowArea = map.area !== -1 ? String(row[map.area] || '').trim() : '';
+                    
+                    let scoreRaw = map.score !== -1 ? String(row[map.score] || '').trim() : '0';
+                    let score = parseFloat(scoreRaw.split('/')[0].trim()) || 0;
+                    
+                    let dateVal = 'Sin fecha';
+                    let excelDateObj = null;
+                    if (map.date !== -1 && row[map.date]) {
+                        let parsedDate = parseExcelDateTime(row[map.date]);
+                        if (parsedDate && !isNaN(parsedDate.getTime())) {
+                            excelDateObj = parsedDate;
+                            let dd = String(parsedDate.getDate()).padStart(2, '0');
+                            let mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                            let yyyy = parsedDate.getFullYear();
+                            dateVal = `${dd}/${mm}/${yyyy}`;
+                        } else {
+                            dateVal = String(row[map.date]).trim().split(' ')[0];
+                        }
+                    }
+
+                    let startTimeVal = map.startTime !== -1 ? row[map.startTime] : null;
+                    let endTimeVal = map.endTime !== -1 ? row[map.endTime] : null;
+                    let examDurationMin = 0;
+                    if (startTimeVal && endTimeVal) {
+                        const startDt = parseExcelDateTime(startTimeVal);
+                        const endDt = parseExcelDateTime(endTimeVal);
+                        if (startDt && endDt) {
+                            const diffMs = endDt - startDt;
+                            if (diffMs > 0) {
+                                examDurationMin = Math.round((diffMs / 60000) * 10) / 10;
+                            }
+                        }
+                    }
+                    let duration = map.duration !== -1 ? parseFloat(row[map.duration]) || 0 : 0;
+                    
+                    if (!tempGrouped[key]) {
+                        tempGrouped[key] = {
+                            dni: dni,
+                            name: fullName,
+                            cargo: cargo,
+                            course: course,
+                            classCode: classCode,
+                            area: rowArea,
+                            lugar: rowLugar,
+                            date: dateVal,
+                            dateObj: excelDateObj,
+                            agency: rowAgency, 
+                            evalsCount: 1,
+                            scoreSum: score,
+                            duration: duration,
+                            examDurationMin: examDurationMin,
+                            rawRows: [{
+                                dni: dni, name: fullName, cargo: cargo, 
+                                course: course, date: dateVal, agency: rowAgency, avg: score, duration: duration, examDurationMin: examDurationMin, originalRow: row
+                            }]
+                        };
+                    } else {
+                        tempGrouped[key].evalsCount++;
+                        tempGrouped[key].scoreSum += score;
+                        if (examDurationMin > tempGrouped[key].examDurationMin) {
+                            tempGrouped[key].examDurationMin = examDurationMin;
+                        }
+                        tempGrouped[key].rawRows.push({
+                            dni: dni, name: fullName, cargo: cargo, 
+                            course: course, date: dateVal, agency: rowAgency, avg: score, duration: duration, examDurationMin: examDurationMin, originalRow: row
+                        });
+                    }
+                });
+
+                let targetAgency = String(agencyName || '').trim().toUpperCase();
+                let filteredGroups = Object.values(tempGrouped).filter(group => {
                     let matchAgency = false;
                     
                     if (filters && Array.isArray(filters.allowedAgencies) && filters.allowedAgencies.length > 0) {
-                        matchAgency = filters.allowedAgencies.map(a => String(a).toUpperCase()).includes(rowAgency);
+                        matchAgency = filters.allowedAgencies.map(a => String(a).toUpperCase()).includes(group.agency);
                     } else if (targetAgency !== '') {
-                        matchAgency = (rowAgency === targetAgency);
+                        matchAgency = (group.agency === targetAgency);
                     } else {
                         matchAgency = true;
                     }
 
                     if (filters && filters.ubicacion) {
-                        let rowLugar = map.lugar !== -1 ? String(row[map.lugar] || '').trim() : '';
-                        
                         function normStr(s) {
                             if (!s) return '';
                             return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
                         }
                         
-                        let isLima = normStr(rowLugar).includes('lima') || normStr(rowLugar).includes('callao');
+                        let isLima = normStr(group.lugar).includes('lima') || normStr(group.lugar).includes('callao');
                         if (filters.ubicacion.toUpperCase() === 'LIMA' && !isLima) matchAgency = false;
                         if (filters.ubicacion.toUpperCase() === 'PROVINCIA' && isLima) matchAgency = false;
                     }
 
-                    let targetTopic = String(filters.topic || '').trim().toUpperCase();
-                    let matchTopic = targetTopic === '' || (map.topic !== -1 && String(row[map.topic] || '').trim().toUpperCase() === targetTopic);
+                    let targetTopic = String(filters.topic || '').trim();
+                    let matchTopic = targetTopic === '' || group.course === targetTopic;
 
-                    let targetArea = String(filters.area || '').trim().toUpperCase();
-                    let matchArea = targetArea === '' || (map.area !== -1 && String(row[map.area] || '').trim().toUpperCase() === targetArea);
+                    let targetArea = String(filters.area || '').trim();
+                    let matchArea = targetArea === '' || group.area === targetArea;
+                    
+                    let targetClassCode = String(filters.classCode || '').trim();
+                    let matchClassCode = targetClassCode === '' || group.classCode === targetClassCode;
 
-                    let targetClassCode = String(filters.classCode || '').trim().toUpperCase();
-                    let matchClassCode = targetClassCode === '' || (map.classCode !== -1 && String(row[map.classCode] || '').trim().toUpperCase() === targetClassCode);
-
-                    let targetLugar = String(filters.lugar || '').trim().toUpperCase();
-                    let matchLugar = targetLugar === '' || (map.lugar !== -1 && String(row[map.lugar] || '').trim().toUpperCase() === targetLugar);
+                    let targetLugar = String(filters.lugar || '').trim();
+                    let matchLugar = targetLugar === '' || group.lugar === targetLugar;
 
                     let matchDate = true;
-                    if (filters.dateStart || filters.dateEnd) {
-                        let dateValue = map.date !== -1 ? row[map.date] : '';
-                        if (dateValue) {
-                            let parts = String(dateValue).trim().split(' ')[0].split('/');
-                            let rowDateStr = parts.length === 3 ? `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}` : '';
-                            if (rowDateStr) {
-                                if (filters.dateStart && rowDateStr < filters.dateStart) matchDate = false;
-                                if (filters.dateEnd && rowDateStr > filters.dateEnd) matchDate = false;
-                            }
+                    if (filters && (filters.dateStart || filters.dateEnd)) {
+                        if (group.dateObj) {
+                            let rowDateStr = `${group.dateObj.getFullYear()}-${String(group.dateObj.getMonth() + 1).padStart(2, '0')}-${String(group.dateObj.getDate()).padStart(2, '0')}`;
+                            if (filters.dateStart && rowDateStr < filters.dateStart) matchDate = false;
+                            if (filters.dateEnd && rowDateStr > filters.dateEnd) matchDate = false;
+                        } else {
+                            matchDate = false;
                         }
                     }
-
+                    
                     return matchAgency && matchTopic && matchArea && matchClassCode && matchLugar && matchDate;
                 });
 
-                if (filteredData.length === 0 && rows.length > 0) {
-                const tableContainer = document.querySelector('.bg-white.rounded-xl.shadow-sm.border.border-slate-100.overflow-hidden');
-                if (tableContainer) {
-                    tableContainer.innerHTML = `
-                        <div style="padding: 30px; text-align: center;">
-                            <div style="background-color: #fee2e2; border: 2px solid #ef4444; padding: 20px; border-radius: 12px; display: inline-block; max-width: 800px; text-align: left;">
-                                <h3 style="color: #b91c1c; font-size: 18px; font-weight: bold; margin-bottom: 15px;">⚠️ Información no encontrada</h3>
-                                <p style="color: #7f1d1d; font-size: 15px; margin-bottom: 15px;">No se encontraron registros para la agencia <strong>${agencyName}</strong> con los filtros actuales.</p>
-                                <p style="color: #7f1d1d; font-size: 15px;">Filtros: ${JSON.stringify(filters)}</p>
+                if (filteredGroups.length === 0 && rows.length > 0) {
+                    const tableContainer = document.querySelector('.bg-white.rounded-xl.shadow-sm.border.border-slate-100.overflow-hidden');
+                    if (tableContainer) {
+                        tableContainer.innerHTML = `
+                            <div style="padding: 30px; text-align: center;">
+                                <div style="background-color: #fee2e2; border: 2px solid #ef4444; padding: 20px; border-radius: 12px; display: inline-block; max-width: 800px; text-align: left;">
+                                    <h3 style="color: #b91c1c; font-size: 18px; font-weight: bold; margin-bottom: 15px;">🔍 Información no encontrada</h3>
+                                    <p style="color: #7f1d1d; font-size: 15px; margin-bottom: 15px;">No se encontraron registros para la agencia <strong>${agencyName}</strong> con los filtros actuales.</p>
+                                    <p style="color: #7f1d1d; font-size: 15px;">Filtros: ${JSON.stringify(filters)}</p>
+                                </div>
                             </div>
-                        </div>
-                    `;
-                }
-                return;
-            }
-
-            let coursesMap = {};
-            let tempGrouped = {};
-            globalAggregatedPeople = [];
-
-            filteredData.forEach(row => {
-                let dniRaw = map.dni !== -1 && row[map.dni] ? String(row[map.dni]).trim() : '';
-                let dni = dniRaw !== '' ? dniRaw : 'Sin DNI';
-                let fName = map.nombres !== -1 && row[map.nombres] ? String(row[map.nombres]).trim() : '';
-                let lName = map.apellidos !== -1 && row[map.apellidos] ? String(row[map.apellidos]).trim() : '';
-                let fullName = '';
-                if (fName || lName) {
-                    fullName = `${fName} ${lName}`.trim();
-                } else {
-                    fullName = map.defaultName !== -1 && row[map.defaultName] ? String(row[map.defaultName]).trim() : 'Anónimo';
-                }
-                
-                let rowAgency = map.empresa !== -1 && row[map.empresa] ? String(row[map.empresa]).trim().toUpperCase() : '';
-                if (fullName === 'Anónimo' && !rowAgency) return;
-                let currentAgency = (filters && filters.agency) ? filters.agency.toUpperCase() : (rowAgency || 'SIN AGENCIA');
-                
-                let cargo = map.cargo !== -1 && row[map.cargo] ? String(row[map.cargo]).trim() : '-';
-                let rowLugar = map.lugar !== -1 ? String(row[map.lugar] || '').trim().toUpperCase() : '';
-                
-                let scoreRaw = map.score !== -1 ? String(row[map.score] || '').trim() : '0';
-                let score = parseFloat(scoreRaw.split('/')[0].trim()) || 0;
-
-                let startTimeVal = map.startTime !== -1 ? row[map.startTime] : null;
-                let endTimeVal = map.endTime !== -1 ? row[map.endTime] : null;
-                let examDurationMin = 0;
-                if (startTimeVal && endTimeVal) {
-                    const startDt = parseExcelDateTime(startTimeVal);
-                    const endDt = parseExcelDateTime(endTimeVal);
-                    if (startDt && endDt) {
-                        const diffMs = endDt - startDt;
-                        if (diffMs > 0) {
-                            examDurationMin = Math.round((diffMs / 60000) * 10) / 10;
-                        }
+                        `;
                     }
+                    return;
                 }
-                let duration = map.duration !== -1 ? parseFloat(row[map.duration]) || 0 : 0;
 
-                let course = map.topic !== -1 && row[map.topic] ? String(row[map.topic]).trim() : 'General';
-                let classCode = map.classCode !== -1 && row[map.classCode] ? String(row[map.classCode]).trim() : '';
+                globalAggregatedPeople = [];
+                globalRepeatedEvaluations = [];
+                let coursesMap = {};
                 
-                let dateVal = 'Sin fecha';
-                if (map.date !== -1 && row[map.date]) {
-                    let parsedDate = parseExcelDateTime(row[map.date]);
-                    if (parsedDate && !isNaN(parsedDate.getTime())) {
-                        let dd = String(parsedDate.getDate()).padStart(2, '0');
-                        let mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
-                        let yyyy = parsedDate.getFullYear();
-                        dateVal = `${dd}/${mm}/${yyyy}`;
-                    } else {
-                        dateVal = String(row[map.date]).trim().split(' ')[0];
+                filteredGroups.forEach(group => {
+                    let currentAgency = (filters && filters.agency) ? filters.agency.toUpperCase() : group.agency;
+                    group.agency = currentAgency;
+                    group.rawRows.forEach(r => r.agency = currentAgency);
+                    
+                    let avgScore = group.evalsCount > 0 ? (group.scoreSum / group.evalsCount) : 0;
+                    group.avg = Math.round(avgScore * 100) / 100;
+                    
+                    globalAggregatedPeople.push(group);
+                    
+                    if (group.evalsCount > 1) {
+                        globalRepeatedEvaluations.push(...group.rawRows);
                     }
-                }
-
-                let identifier = dni !== 'Sin DNI' ? dni : fullName.toLowerCase();
-                const key = identifier + '|' + classCode.toLowerCase() + '|' + course.toLowerCase();
-                
-                if (!tempGrouped[key]) {
-                    tempGrouped[key] = {
-                        dni: dni,
-                        name: fullName,
-                        cargo: cargo,
-                        course: course,
-                        date: dateVal,
-                        agency: currentAgency,
-                        evalsCount: 1,
-                        scoreSum: score,
-                        duration: duration,
-                        examDurationMin: examDurationMin,
-                        rawRows: [{
-                            dni: dni, name: fullName, cargo: cargo, 
-                            course: course, date: dateVal, agency: currentAgency, avg: score, duration: duration, examDurationMin: examDurationMin
-                        }]
-                    };
-                } else {
-                    tempGrouped[key].evalsCount++;
-                    tempGrouped[key].scoreSum += score;
-                    if (examDurationMin > tempGrouped[key].examDurationMin) {
-                        tempGrouped[key].examDurationMin = examDurationMin;
+                    
+                    if (!coursesMap[group.course]) {
+                        coursesMap[group.course] = { course: group.course, totalScore: 0, count: 0 };
                     }
-                    tempGrouped[key].rawRows.push({
-                        dni: dni, name: fullName, cargo: cargo, 
-                        course: course, date: dateVal, agency: currentAgency, avg: score, duration: duration, examDurationMin: examDurationMin
-                    });
-                }
-
-                // We still want to group courses for the chart
-                if(!coursesMap[course]) {
-                    coursesMap[course] = { course: course, totalScore: 0, count: 0 };
-                }
-                coursesMap[course].totalScore += score;
-                coursesMap[course].count += 1;
-            });
-
-            globalAggregatedPeople = Object.values(tempGrouped).map(g => {
-                const avgScore = g.evalsCount > 0 ? (g.scoreSum / g.evalsCount) : 0;
-                return {
-                    ...g,
-                    avg: Math.round(avgScore * 100) / 100
-                };
-            });
-
-            globalRepeatedEvaluations = [];
-            Object.values(tempGrouped).forEach(g => {
-                if (g.evalsCount > 1) {
-                    globalRepeatedEvaluations.push(...g.rawRows);
-                }
-            });
+                    coursesMap[group.course].totalScore += avgScore;
+                    coursesMap[group.course].count += 1;
+                });
 
             globalCourseAverages = Object.values(coursesMap).map(c => ({
                 course: c.course,
