@@ -499,6 +499,7 @@
                 let filteredData = rows.filter(row => {
                     let targetAgency = String(agencyName || '').trim().toUpperCase();
                     let rowAgency = map.empresa !== -1 ? String(row[map.empresa] || '').trim().toUpperCase() : '';
+                    if (!rowAgency) rowAgency = 'SIN AGENCIA';
                     if (rowAgency === 'WIN') rowAgency = 'WIN EMPRESAS';
                     
                     let matchAgency = false;
