@@ -333,26 +333,7 @@
             });
         });
 
-        function exportFilteredData() {
-            try {
-                if (typeof XLSX === 'undefined') {
-                    const script = document.createElement('script');
-                    script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-                    document.head.appendChild(script);
-                    alert("Cargando la biblioteca de Excel. Por favor, intenta de nuevo en unos segundos.");
-                    return;
-                }
-                
-                const dataToExport = currentViewMode === 'participants' ? globalAggregatedPeople : globalRepeatedEvaluations;
-                const ws = XLSX.utils.json_to_sheet(dataToExport);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-                XLSX.writeFile(wb, "Reporte_Capacitaciones.xlsx");
-            } catch (e) {
-                console.error("Error al exportar:", e);
-                alert("Hubo un error al exportar los datos.");
-            }
-        }
+
 
         function checkTokenAndLoad() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -507,7 +488,10 @@
                     cargo: getIndex(['cargo', 'puesto', 'rol'], 23),
                     lugar: getIndex(['lugar de trabajo', 'lugar', 'sede'], 26),
                     topic: getIndex(['nombre de la capacitaci', 'tema', 'curso'], 32),
-                    classCode: getIndex(['codigo', 'digo de tu formaci'], 35)
+                    classCode: getIndex(['codigo', 'digo de tu formaci'], 35),
+                    startTime: getIndex(['hora de inicio', 'start time'], 3),
+                    endTime: getIndex(['hora de finalizaci', 'end time', 'hora de entrega'], 4),
+                    duration: getIndex(['duraci', 'horas'], 53)
                 };
 
                 let rows = data.slice(1);
@@ -594,20 +578,30 @@
                     fullName = map.defaultName !== -1 && row[map.defaultName] ? String(row[map.defaultName]).trim() : 'Anónimo';
                 }
                 
-                let currentAgency = map.empresa !== -1 && row[map.empresa] ? String(row[map.empresa]).trim().toUpperCase() : '';
-                if (fullName === 'Anónimo' && !currentAgency) return;
-                currentAgency = currentAgency || 'SIN AGENCIA';
+                let rowAgency = map.empresa !== -1 && row[map.empresa] ? String(row[map.empresa]).trim().toUpperCase() : '';
+                if (fullName === 'Anónimo' && !rowAgency) return;
+                let currentAgency = (filters && filters.agency) ? filters.agency.toUpperCase() : (rowAgency || 'SIN AGENCIA');
                 
                 let cargo = map.cargo !== -1 && row[map.cargo] ? String(row[map.cargo]).trim() : '-';
+                let rowLugar = map.lugar !== -1 ? String(row[map.lugar] || '').trim().toUpperCase() : '';
                 
-                let scoreRaw = map.score !== -1 && row[map.score] ? String(row[map.score]) : '0';
-                let score = 0;
-                if (scoreRaw.includes('/')) {
-                    score = parseFloat(scoreRaw.split('/')[0]);
-                } else {
-                    score = parseFloat(scoreRaw);
+                let scoreRaw = map.score !== -1 ? String(row[map.score] || '').trim() : '0';
+                let score = parseFloat(scoreRaw.split('/')[0].trim()) || 0;
+
+                let startTimeVal = map.startTime !== -1 ? row[map.startTime] : null;
+                let endTimeVal = map.endTime !== -1 ? row[map.endTime] : null;
+                let examDurationMin = 0;
+                if (startTimeVal && endTimeVal) {
+                    const startDt = parseExcelDateTime(startTimeVal);
+                    const endDt = parseExcelDateTime(endTimeVal);
+                    if (startDt && endDt) {
+                        const diffMs = endDt - startDt;
+                        if (diffMs > 0) {
+                            examDurationMin = Math.round((diffMs / 60000) * 10) / 10;
+                        }
+                    }
                 }
-                if (isNaN(score)) score = 0;
+                let duration = map.duration !== -1 ? parseFloat(row[map.duration]) || 0 : 0;
 
                 let course = map.topic !== -1 && row[map.topic] ? String(row[map.topic]).trim() : 'General';
                 let classCode = map.classCode !== -1 && row[map.classCode] ? String(row[map.classCode]).trim() : '';
@@ -625,7 +619,6 @@
                     }
                 }
 
-                // Group evaluations to match index.html exactly
                 let identifier = dni !== 'Sin DNI' ? dni : fullName.toLowerCase();
                 const key = identifier + '|' + classCode.toLowerCase() + '|' + course.toLowerCase();
                 
@@ -639,17 +632,22 @@
                         agency: currentAgency,
                         evalsCount: 1,
                         scoreSum: score,
+                        duration: duration,
+                        examDurationMin: examDurationMin,
                         rawRows: [{
                             dni: dni, name: fullName, cargo: cargo, 
-                            course: course, date: dateVal, agency: currentAgency, avg: score
+                            course: course, date: dateVal, agency: currentAgency, avg: score, duration: duration, examDurationMin: examDurationMin
                         }]
                     };
                 } else {
                     tempGrouped[key].evalsCount++;
                     tempGrouped[key].scoreSum += score;
+                    if (examDurationMin > tempGrouped[key].examDurationMin) {
+                        tempGrouped[key].examDurationMin = examDurationMin;
+                    }
                     tempGrouped[key].rawRows.push({
                         dni: dni, name: fullName, cargo: cargo, 
-                        course: course, date: dateVal, agency: currentAgency, avg: score
+                        course: course, date: dateVal, agency: currentAgency, avg: score, duration: duration, examDurationMin: examDurationMin
                     });
                 }
 
@@ -1124,31 +1122,50 @@
                 }
                 
                 const viewMode = document.getElementById('viewModeToggle').value;
+                let dataToExport = [];
                 
-                // If they are on "Total Evaluaciones (Repetidos)", they probably want to export the raw evaluations.
-                // However, we don't have access to the filteredData directly from global scope.
-                // Reconstructing it from globalAggregatedPeople vs throwing an error.
-                // We stored rawRow in tempGrouped, but that's only the FIRST row.
-                // Since this is just a quick export, let's export globalAggregatedPeople.
-                let activeList = globalAggregatedPeople;
-
-                if (activeList.length === 0) {
+                if (globalAggregatedPeople.length === 0) {
                     alert("No hay registros para exportar.");
                     return;
                 }
-                
-                const dataToExport = activeList.map(r => ({
-                    "Nombre Completo": r.fullName || r.name,
-                    "DNI": r.dni,
-                    "Cargo": r.role || r.cargo,
-                    "Empresa / Socio": r.agency,
-                    "Lugar / Sede": r.lugar,
-                    "Area": r.area,
-                    "Capacitación": r.course,
-                    "Nota Promedio": r.score,
-                    "Nº Intentos": r.evalsCount || r.count || 1,
-                    "Estado": r.score >= 14 ? "Aprobado" : "Refuerzo"
-                }));
+
+                if (viewMode === 'evaluations') {
+                    // Export every raw evaluation
+                    globalAggregatedPeople.forEach(person => {
+                        person.rawRows.forEach(row => {
+                            dataToExport.push({
+                                "Nombre Completo": row.name || person.fullName || person.name,
+                                "Empresa / Socio": row.agency || person.agency,
+                                "Área": person.area || '',
+                                "Cargo": row.cargo || person.cargo,
+                                "Lugar / Sede": person.lugar || '',
+                                "Tema": row.course || person.course,
+                                "Código de Aula": person.classCode || 'General',
+                                "Fecha": row.date || person.date,
+                                "Nota": row.avg !== undefined ? row.avg : person.score,
+                                "Tiempo de Examen (min)": row.examDurationMin !== undefined ? row.examDurationMin : (person.examDurationMin || 0),
+                                "Duración (h)": row.duration !== undefined ? row.duration : (person.duration || 0),
+                                "Estado": (row.avg !== undefined ? row.avg : person.score) >= passingScore ? "Aprobado" : "Requiere Refuerzo"
+                            });
+                        });
+                    });
+                } else {
+                    // Export deduplicated
+                    dataToExport = globalAggregatedPeople.map(r => ({
+                        "Nombre Completo": r.fullName || r.name,
+                        "Empresa / Socio": r.agency,
+                        "Área": r.area || '',
+                        "Cargo": r.cargo,
+                        "Lugar / Sede": r.lugar || '',
+                        "Tema": r.course,
+                        "Código de Aula": r.classCode || 'General',
+                        "Fecha": r.date,
+                        "Nota": r.score,
+                        "Tiempo de Examen (min)": r.examDurationMin || 0,
+                        "Duración (h)": r.duration || 0,
+                        "Estado": r.score >= passingScore ? "Aprobado" : "Requiere Refuerzo"
+                    }));
+                }
                 
                 const ws = XLSX.utils.json_to_sheet(dataToExport);
                 const wb = XLSX.utils.book_new();
@@ -1158,6 +1175,52 @@
                 console.error("Error al exportar:", e);
                 alert("Hubo un error al exportar los datos.");
             }
+        }
+        function parseExcelDateTime(val) {
+            if (!val) return null;
+            if (val instanceof Date) return val;
+            let parsed = new Date(val);
+            if (!isNaN(parsed.getTime())) return parsed;
+            const str = String(val).trim();
+            const parts = str.split(' ');
+            if (parts.length >= 2) {
+                const datePart = parts[0]; 
+                const timePart = parts[1]; 
+                const dateParts = datePart.split('/');
+                const timeParts = timePart.split(':');
+                if (dateParts.length === 3 && timeParts.length >= 2) {
+                    let month = parseInt(dateParts[0]) - 1;
+                    let day = parseInt(dateParts[1]);
+                    let year = parseInt(dateParts[2]);
+                    if (year < 100) year += 2000;
+                    if (month > 11) {
+                        const temp = month + 1;
+                        month = day - 1;
+                        day = temp;
+                    }
+                    const hours = parseInt(timeParts[0]) || 0;
+                    const minutes = parseInt(timeParts[1]) || 0;
+                    const seconds = parseInt(timeParts[2]) || 0;
+                    parsed = new Date(year, month, day, hours, minutes, seconds);
+                    if (!isNaN(parsed.getTime())) return parsed;
+                }
+            } else if (parts.length === 1 && parts[0].includes('/')) {
+                const dateParts = parts[0].split('/');
+                if (dateParts.length === 3) {
+                    let month = parseInt(dateParts[0]) - 1;
+                    let day = parseInt(dateParts[1]);
+                    let year = parseInt(dateParts[2]);
+                    if (year < 100) year += 2000;
+                    if (month > 11) {
+                        const temp = month + 1;
+                        month = day - 1;
+                        day = temp;
+                    }
+                    parsed = new Date(year, month, day);
+                    if (!isNaN(parsed.getTime())) return parsed;
+                }
+            }
+            return null;
         }
     </script>
 </body>
