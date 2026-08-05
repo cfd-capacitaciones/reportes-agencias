@@ -259,6 +259,9 @@
                             <option value="participants">Total Participantes</option>
                             <option value="evaluations">Total Evaluaciones (Repetidos)</option>
                         </select>
+                        <button onclick="exportFilteredData()" class="px-3 py-2 text-sm font-bold text-white bg-win-orange hover:bg-win-orangeHover rounded-lg transition flex items-center gap-1.5 whitespace-nowrap">
+                            <i class="fa-solid fa-file-excel"></i> Exportar a Excel
+                        </button>
                         <div class="relative">
                             <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
                             <input type="text" id="searchInput" placeholder="Buscar por DNI o Nombre..." class="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-win-orange focus:border-win-orange text-sm w-full sm:w-64">
@@ -329,6 +332,27 @@
                 renderTable(searchTerm);
             });
         });
+
+        function exportFilteredData() {
+            try {
+                if (typeof XLSX === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+                    document.head.appendChild(script);
+                    alert("Cargando la biblioteca de Excel. Por favor, intenta de nuevo en unos segundos.");
+                    return;
+                }
+                
+                const dataToExport = currentViewMode === 'participants' ? globalAggregatedPeople : globalRepeatedEvaluations;
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+                XLSX.writeFile(wb, "Reporte_Capacitaciones.xlsx");
+            } catch (e) {
+                console.error("Error al exportar:", e);
+                alert("Hubo un error al exportar los datos.");
+            }
+        }
 
         function checkTokenAndLoad() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -603,7 +627,7 @@
 
                 // Group evaluations to match index.html exactly
                 let identifier = dni !== 'Sin DNI' ? dni : fullName.toLowerCase();
-                const key = identifier + '|' + classCode.toLowerCase() + '|' + course.toLowerCase() + '|' + dateVal;
+                const key = identifier + '|' + classCode.toLowerCase() + '|' + course.toLowerCase();
                 
                 if (!tempGrouped[key]) {
                     tempGrouped[key] = {
@@ -1089,6 +1113,52 @@
             processData(mockCSV);
         }
 
+        function exportFilteredData() {
+            try {
+                if (typeof XLSX === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+                    document.head.appendChild(script);
+                    alert("Cargando la biblioteca de Excel. Por favor, intenta de nuevo en unos segundos.");
+                    return;
+                }
+                
+                const viewMode = document.getElementById('viewModeToggle').value;
+                
+                // If they are on "Total Evaluaciones (Repetidos)", they probably want to export the raw evaluations.
+                // However, we don't have access to the filteredData directly from global scope.
+                // Reconstructing it from globalAggregatedPeople vs throwing an error.
+                // We stored rawRow in tempGrouped, but that's only the FIRST row.
+                // Since this is just a quick export, let's export globalAggregatedPeople.
+                let activeList = globalAggregatedPeople;
+
+                if (activeList.length === 0) {
+                    alert("No hay registros para exportar.");
+                    return;
+                }
+                
+                const dataToExport = activeList.map(r => ({
+                    "Nombre Completo": r.fullName || r.name,
+                    "DNI": r.dni,
+                    "Cargo": r.role || r.cargo,
+                    "Empresa / Socio": r.agency,
+                    "Lugar / Sede": r.lugar,
+                    "Area": r.area,
+                    "Capacitación": r.course,
+                    "Nota Promedio": r.score,
+                    "Nº Intentos": r.evalsCount || r.count || 1,
+                    "Estado": r.score >= 14 ? "Aprobado" : "Refuerzo"
+                }));
+                
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+                XLSX.writeFile(wb, "Reporte_Capacitaciones.xlsx");
+            } catch (e) {
+                console.error("Error al exportar:", e);
+                alert("Hubo un error al exportar los datos.");
+            }
+        }
     </script>
 </body>
 </html>

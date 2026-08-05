@@ -1043,8 +1043,8 @@
                     tbody.innerHTML = '';
                     let userBaseUrl = document.getElementById('public-base-url').value.trim();
                     if (!userBaseUrl) {
-                        alert("Por favor ingresa la URL pública de tu reporte-externo.html en el Paso 2.");
-                        return;
+                        // Fallback to local for testing
+                        userBaseUrl = 'reporte-externo.html';
                     }
 
                     const cleanBaseUrl = userBaseUrl.split('?')[0].split('#')[0];
@@ -1184,54 +1184,45 @@
             const chanUpper = channel.toUpperCase();
             
             const matchingNames = activeAgencies.filter(a => a.name.toUpperCase() === chanUpper);
+            const isLima = normalizeString(lugar).includes('lima') || normalizeString(lugar).includes('callao');
+            const targetUbicacion = isLima ? 'LIMA' : 'PROVINCIA';
             
             if (matchingNames.length === 0) {
                 // If it is not in the roster at all, dynamically create and add it!
-                const isLima = normalizeString(lugar).includes('lima') || normalizeString(lugar).includes('callao');
                 const newAgency = {
                     jefe: 'Por asignar',
                     supervisor: 'Por asignar',
                     name: channel,
                     region: (lugar || 'LIMA Y CALLAO').toUpperCase(),
-                    ubicacion: isLima ? 'LIMA' : 'PROVINCIA'
+                    ubicacion: targetUbicacion
                 };
                 activeAgencies.push(newAgency);
                 localStorage.setItem('win_active_agencies', JSON.stringify(activeAgencies));
                 
                 const statusEl = document.getElementById('status-roster');
                 if (statusEl) {
-                    statusEl.innerText = `Agencias: ${activeAgencies.length} activas`;
+                    statusEl.innerText = `Nuevas agencias detectadas y agregadas automáticamente.`;
+                    statusEl.classList.remove('text-slate-500');
+                    statusEl.classList.add('text-win-orange');
                 }
                 return newAgency;
             }
             
-            // If we have matching agency names, check if the region matches
-            const regionMatch = matchingNames.find(a => regionsMatch(a.region, lugar));
-            if (regionMatch) return regionMatch;
+            // Try to find the specific region match first
+            const exactMatch = matchingNames.find(a => (a.ubicacion || '').toUpperCase() === targetUbicacion);
+            if (exactMatch) return exactMatch;
             
-            // If no region match, but the place (lugar) is different from the existing matching agencies' regions,
-            // we should create a new branch of this agency in the new region!
-            const existsThisRegion = matchingNames.some(a => regionsMatch(a.region, lugar));
-            if (!existsThisRegion && lugar) {
-                const isLima = normalizeString(lugar).includes('lima') || normalizeString(lugar).includes('callao');
-                const newAgency = {
-                    jefe: matchingNames[0].jefe || 'Por asignar',
-                    supervisor: matchingNames[0].supervisor || 'Por asignar',
-                    name: matchingNames[0].name, // keep original casing
-                    region: lugar.toUpperCase(),
-                    ubicacion: isLima ? 'LIMA' : 'PROVINCIA'
-                };
-                activeAgencies.push(newAgency);
-                localStorage.setItem('win_active_agencies', JSON.stringify(activeAgencies));
-                
-                const statusEl = document.getElementById('status-roster');
-                if (statusEl) {
-                    statusEl.innerText = `Agencias: ${activeAgencies.length} activas`;
-                }
-                return newAgency;
-            }
-            
-            return matchingNames[0];
+            // If it exists in roster but for a DIFFERENT region, add the new region dynamically
+            const newRegionAgency = {
+                jefe: 'Por asignar',
+                supervisor: 'Por asignar',
+                name: channel,
+                region: (lugar || (isLima ? 'LIMA Y CALLAO' : 'PROVINCIA')).toUpperCase(),
+                ubicacion: targetUbicacion
+            };
+            activeAgencies.push(newRegionAgency);
+            localStorage.setItem('win_active_agencies', JSON.stringify(activeAgencies));
+            return newRegionAgency;
         }
 
         // File column mappings (0-based indices for Excel rows)
@@ -1618,7 +1609,7 @@
             const grouped = {};
             parsedResponses.forEach(r => {
                 let identifier = r.dni ? r.dni : (r.name || '').toLowerCase();
-                const key = identifier + '|' + (r.classCode || '').toLowerCase() + '|' + (r.topic || '').toLowerCase() + '|' + (r.date || '');
+                const key = identifier + '|' + (r.classCode || '').toLowerCase() + '|' + (r.topic || '').toLowerCase();
                 if (!grouped[key]) {
                     grouped[key] = { ...r, scoreSum: r.score, count: 1 };
                 } else {
