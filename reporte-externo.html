@@ -513,8 +513,14 @@
                     }
 
                     if (filters && filters.ubicacion) {
-                        let rowLugar = map.lugar !== -1 ? String(row[map.lugar] || '').trim().toLowerCase() : '';
-                        let isLima = rowLugar.includes('lima') || rowLugar.includes('callao');
+                        let rowLugar = map.lugar !== -1 ? String(row[map.lugar] || '').trim() : '';
+                        
+                        function normStr(s) {
+                            if (!s) return '';
+                            return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                        }
+                        
+                        let isLima = normStr(rowLugar).includes('lima') || normStr(rowLugar).includes('callao');
                         if (filters.ubicacion.toUpperCase() === 'LIMA' && !isLima) matchAgency = false;
                         if (filters.ubicacion.toUpperCase() === 'PROVINCIA' && isLima) matchAgency = false;
                     }
