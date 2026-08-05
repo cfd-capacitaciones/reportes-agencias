@@ -1136,15 +1136,13 @@
                             dataToExport.push({
                                 "Nombre Completo": row.name || person.fullName || person.name,
                                 "Empresa / Socio": row.agency || person.agency,
-                                "Área": person.area || '',
                                 "Cargo": row.cargo || person.cargo,
-                                "Lugar / Sede": person.lugar || '',
                                 "Tema": row.course || person.course,
                                 "Código de Aula": person.classCode || 'General',
                                 "Fecha": row.date || person.date,
                                 "Nota": row.avg !== undefined ? row.avg : person.score,
                                 "Tiempo de Examen (min)": row.examDurationMin !== undefined ? row.examDurationMin : (person.examDurationMin || 0),
-                                "Duración (h)": row.duration !== undefined ? row.duration : (person.duration || 0),
+                                "Nº Intentos": person.evalsCount || 1,
                                 "Estado": (row.avg !== undefined ? row.avg : person.score) >= passScore ? "Aprobado" : "Requiere Refuerzo"
                             });
                         });
@@ -1154,15 +1152,13 @@
                     dataToExport = globalAggregatedPeople.map(r => ({
                         "Nombre Completo": r.fullName || r.name,
                         "Empresa / Socio": r.agency,
-                        "Área": r.area || '',
                         "Cargo": r.cargo,
-                        "Lugar / Sede": r.lugar || '',
                         "Tema": r.course,
                         "Código de Aula": r.classCode || 'General',
                         "Fecha": r.date,
                         "Nota": r.avg,
                         "Tiempo de Examen (min)": r.examDurationMin || 0,
-                        "Duración (h)": r.duration || 0,
+                        "Nº Intentos": r.evalsCount || 1,
                         "Estado": r.avg >= passScore ? "Aprobado" : "Requiere Refuerzo"
                     }));
                 }
