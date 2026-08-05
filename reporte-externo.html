@@ -1160,10 +1160,10 @@
                         "Tema": r.course,
                         "Código de Aula": r.classCode || 'General',
                         "Fecha": r.date,
-                        "Nota": r.score,
+                        "Nota": r.avg,
                         "Tiempo de Examen (min)": r.examDurationMin || 0,
                         "Duración (h)": r.duration || 0,
-                        "Estado": r.score >= passScore ? "Aprobado" : "Requiere Refuerzo"
+                        "Estado": r.avg >= passScore ? "Aprobado" : "Requiere Refuerzo"
                     }));
                 }
                 
